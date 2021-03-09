@@ -1,0 +1,11 @@
+# LaTeX Files
+*.aux
+*.log
+*.out
+*.synctex.gz
+**_minted*
+
+# Python and PyCharm Files
+**/.hypothesis
+**/pyta_report.html
+**/__pycache__

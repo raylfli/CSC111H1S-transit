@@ -9,3 +9,6 @@
 **/.hypothesis
 **/pyta_report.html
 **/__pycache__
+
+# Mac Files
+.DS_Store

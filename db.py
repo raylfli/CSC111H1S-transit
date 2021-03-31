@@ -1,4 +1,4 @@
-"""SQL shenanigens [DEPLOY]
+"""SQL shenanigans [DEPLOY]
 
 At any given stop and time, there are two options for connectivity:
     - The next stop on the same line
@@ -20,19 +20,23 @@ import sqlite3
 def init_db() -> bool:
     """If transit.db does not exist, create this database. Otherwise do nothing.
     Returns true if operation succeeds. Else false, and error message is printed to console.
+
+    Hmm i realized whether or not the file exists is actually not a good check for if the
+    database exists/is populated. Will revisit.
+    TODO: make checking if db exists better
     """
     if not os.path.isfile('transit.db'):
-        con = sqlite3.connect('transit.db')
+        try:
+            con = sqlite3.connect('transit.db')
 
-        con.execute('''CREATE TABLE [IF NOT EXISTS] stoptimes 
-                        (trip_id, arrival_time, departure_time, stop_id, stop_sequence, 
-                        stop_headsign, pickup_type, drop_off_type, shape_dist_traveled)''')
+            con.execute('''CREATE TABLE IF NOT EXISTS stoptimes 
+                            (trip_id, arrival_time, departure_time, stop_id, stop_sequence, 
+                            stop_headsign, pickup_type, drop_off_type, shape_dist_traveled)''')
 
         # create database
-        try:
-            _insert_st_file('stop_times1.txt', 'stoptimes', con)
-            _insert_st_file('stop_times2.txt', 'stoptimes', con)
-            _insert_st_file('stop_times3.txt', 'stoptimes', con)
+            _insert_st_file('data/stop_times_1.txt', 'stoptimes', con)
+            _insert_st_file('data/stop_times_2.txt', 'stoptimes', con)
+            _insert_st_file('data/stop_times_3.txt', 'stoptimes', con)
         except Exception as e:
             print(e)
             return False
@@ -91,6 +95,10 @@ class QueryDB:
             Only columns which exist in the table are provided. Columns that do not exist are
             ignored. If none of the columns provided exist in this table, then an empty list is
             returned.
+
+        Note: all this checking is helpful when using this function. However, does it add
+        unecessary overhead? I have no idea. In any case, once all code is up and running it can
+        probably be deleted.
         """
         if table not in self.tables:
             return []

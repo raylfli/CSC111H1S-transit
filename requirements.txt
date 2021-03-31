@@ -1,2 +1,5 @@
 # CSC111H1S 2021 @ UofT - Transit Planner
 # Anna Cho, Charles Wong, Grace Tian, Raymond Li
+
+pandas
+numpy

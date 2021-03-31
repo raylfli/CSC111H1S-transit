@@ -23,15 +23,15 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 #   - INDEX: stop_id: ``np.uint16``
 #   - stop_code: ``np.uint16``
 #   - stop_name: ``str``
-#   - stop_lat: ``np.float16``
-#   - stop_lon: ``np.float16``
+#   - stop_lat: ``np.float32``
+#   - stop_lon: ``np.float32``
 STOPS_DF = pd.read_csv('data/stops.txt',
                        usecols=['stop_id', 'stop_code', 'stop_name', 'stop_lat', 'stop_lon'],
                        dtype={'stop_id': np.uint16,  # 0 to 65_535
                               'stop_code': np.uint16,  # 0 to 65_535
                               'stop_name': str,
-                              'stop_lat': np.float16,
-                              'stop_lon': np.float16
+                              'stop_lat': np.float32,
+                              'stop_lon': np.float32
                               },
                        index_col='stop_id'
                        )

@@ -13,7 +13,7 @@ import numpy as np
 from data_dataframes import STOP_TIMES_DF, STOPS_DF, ROUTES_DF
 
 
-def get_stops() -> set[tuple[np.uint16, tuple[np.float16, np.float16]]]:
+def get_stops() -> set[tuple[np.uint16, tuple[np.float32, np.float32]]]:
     """Return a set of tuples representing transit stops.
 
     Returned tuples are in the form: ``(stop_id, (latitude, longitude))``.
@@ -22,7 +22,7 @@ def get_stops() -> set[tuple[np.uint16, tuple[np.float16, np.float16]]]:
     """
     stops = set()
     for row in STOPS_DF.iterrows():
-        stops.add((row[0], (row[1][2], row[1][3])))
+        stops.add((row[0], (row[1]['stop_lat'], row[1]['stop_lon'])))
 
     return stops
 

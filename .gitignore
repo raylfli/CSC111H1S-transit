@@ -10,5 +10,8 @@
 **/pyta_report.html
 **/__pycache__
 
+# database
+*.db
+
 # Mac Files
 .DS_Store

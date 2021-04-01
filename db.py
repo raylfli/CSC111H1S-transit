@@ -11,6 +11,17 @@ Accordingly the stoptimes table is indexed in the following ways:
 Note that times should be padded with zeroes to fit 8 characters.
 i.e.
 7:23:21 -> 07:23:21
+
+Example usage:
+
+Run init_db() once to create the transit database and add all stop times in a table 'stoptimes'.
+Further development of this module, should that happen, will include other tables.
+
+After, you can query the database using the QueryDB object.
+
+q = QueryDB()
+q.get('stoptimes', columns=('trip_id', 'departure_time', 'stop_id'), conditions="stop_id='1277' AND departure_time>'22:00:00'")
+q.close()
 """
 
 import os

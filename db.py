@@ -1,5 +1,25 @@
 """SQL shenanigans [DEPLOY]
 
+Database: transit.db
+
+Tables:
+    - stoptimes
+        * trip_id
+        * arrival_time
+        * departure_time
+        * stop_id
+        * stop_sequence
+        * stop_headsign
+        * pickup_type
+        * drop_off_type
+        * shape_dist_traveled
+    - stops
+        * stop_id
+        * stop_code
+        * stop_name
+        * stop_lat
+        * stop_lon
+
 At any given stop and time, there are two options for connectivity:
     - The next stop on the same line
     - The next bus at the same stop
@@ -22,6 +42,8 @@ After, you can query the database using the QueryDB object.
 q = QueryDB()
 q.get('stoptimes', columns=('trip_id', 'departure_time', 'stop_id'), conditions="stop_id='1277' AND departure_time>'22:00:00'")
 q.close()
+
+The stops table is indexed by stop_id.
 """
 
 import os
@@ -35,6 +57,8 @@ def init_db() -> bool:
     Hmm i realized whether or not the file exists is actually not a good check for if the
     database exists/is populated. Will revisit.
     TODO: make checking if db exists better
+
+    also hardcoding reading the specific files is kinda yucky might want to change that
     """
     if not os.path.isfile('transit.db'):
         try:
@@ -44,10 +68,15 @@ def init_db() -> bool:
                             (trip_id, arrival_time, departure_time, stop_id, stop_sequence, 
                             stop_headsign, pickup_type, drop_off_type, shape_dist_traveled)''')
 
+            con.execute('''CREATE TABLE IF NOT EXISTS stops
+                                        (stop_id, stop_code, stop_name, stop_lat, stop_lon)''')
+
         # create database
             _insert_st_file('data/stop_times_1.txt', 'stoptimes', con)
             _insert_st_file('data/stop_times_2.txt', 'stoptimes', con)
             _insert_st_file('data/stop_times_3.txt', 'stoptimes', con)
+
+            _insert_s_file('data/stops.txt', 'stops', con)
         except Exception as e:
             print(e)
             return False
@@ -55,6 +84,8 @@ def init_db() -> bool:
         # index
         con.execute("CREATE INDEX idx_tiss ON stoptimes (trip_id, stop_sequence)")
         con.execute("CREATE INDEX idx_sidt ON stoptimes (stop_id, departure_time)")
+
+        con.execute("CREATE INDEX idx_si ON stops (stop_id)")
 
         con.commit()
         con.close()
@@ -72,6 +103,17 @@ def _insert_st_file(file: str, table: str, con: sqlite3.Connection):
             entry[1] = entry[1].rjust(8, '0')
             entry[2] = entry[2].rjust(8, '0')
             con.execute(f"INSERT INTO {table} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", tuple(entry))
+
+
+def _insert_s_file(file: str, table: str, con: sqlite3.Connection):
+    with open(file, 'r') as f:
+        f.readline()  # read header
+
+        for line in f:
+            entry = line.strip('\n').split(',')
+            entry = entry[:6]
+            entry.pop(3)
+            con.execute(f"INSERT INTO {table} VALUES (?, ?, ?, ?, ?)", tuple(entry))
 
 
 class QueryDB:

@@ -33,10 +33,12 @@ def get_edge_weights() -> pd.DataFrame:
     Column information:
         - INDEX: stop_id_start (root of the directed edge)
         - stop_id_end (end of the directed edge)
-        - time (departure time from root station)
+        - time_dep (departure time from root station)
+        - time_arr (arrival time to the other station)
         - weight (edge weight)
     """
-    df = pd.DataFrame(columns=['stop_id_start', 'stop_id_end', 'time', 'weight'])
+    cols = ['stop_id_start', 'stop_id_end', 'time_dep', 'time_arr', 'weight']
+    df = pd.DataFrame(columns=cols)
     temp_storage = []
 
     stop_times_iterator = STOP_TIMES_DF.itertuples()
@@ -49,16 +51,14 @@ def get_edge_weights() -> pd.DataFrame:
         next_row = next(stop_times_iterator)
 
         if len(temp_storage) >= 2000:  # number arbitrarily chosen, can adjust for memory usage
-            df = df.append(pd.DataFrame(temp_storage, columns=['stop_id_start', 'stop_id_end',
-                                                               'time', 'weight']))
+            df = df.append(pd.DataFrame(temp_storage, columns=cols))
             temp_storage = []
 
         if curr_row[3] + 1 == next_row[3]:  # stop_sequence comparison
-            temp_storage.append((curr_row[2], next_row[2], curr_row[1],
+            temp_storage.append((curr_row[2], next_row[2], curr_row[1], next_row[1],
                                  (next_row[1] - curr_row[1]).seconds / 60))
 
-    df = df.append(pd.DataFrame(temp_storage, columns=['stop_id_start', 'stop_id_end',
-                                                       'time', 'weight']))
+    df = df.append(pd.DataFrame(temp_storage, columns=cols))
     df.set_index('stop_id_start', inplace=True)
     df.sort_index(inplace=True)
 
@@ -68,5 +68,11 @@ def get_edge_weights() -> pd.DataFrame:
 if __name__ == '__main__':
     # TODO ADD PYTA CHECK
 
-    pass
-    # weights = get_edge_weights()
+    # pass
+    weights = get_edge_weights()
+    weights.to_pickle('data/edge_weights_dump.pkl')
+    # weights = pd.read_pickle('data/edge_weights_dump.pkl')  # TODO REMOVE - pickle dump file
+
+    # arr = [list(weights.index), list(weights.stop_id_end), list(weights.time)]
+    # multi = pd.MultiIndex.from_arrays(arr)
+    # weights_multi = pd.Series(data=weights.weight, index=multi)

@@ -1,4 +1,5 @@
 """..."""
+import csv
 
 
 class Image:
@@ -77,3 +78,21 @@ class Image:
         #
         # lat = 180 / math.pi * (2 * math.atan(math.exp(a)) - math.pi / 2)
         # lon = self.lon_left + x / self.width * lon_delta
+
+
+def load_images(filename: str) -> dict[int, Image]:
+    """..."""
+    images_so_far = {}  # map zoom to Image
+    with open(filename) as file:
+        reader = csv.reader(file)
+
+        for row in reader:
+            file = row[0]
+            zoom = int(row[1])
+            width, height = int(row[2]), int(row[3])
+            lat_top, lat_bottom = float(row[4]), float(row[5])
+            lon_left, lon_right = float(row[6]), float(row[7])
+            images_so_far[zoom] = Image(file, zoom, width, height,
+                                        lat_top, lat_bottom, lon_left, lon_right)
+
+    return images_so_far

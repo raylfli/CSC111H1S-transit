@@ -1,10 +1,11 @@
 """..."""
 import pygame
-from image import Image
+from image import Image, load_images
 from typing import Union
 
 ALLOWED = [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
            pygame.MOUSEMOTION, pygame.KEYDOWN]
+MAX_ZOOM = 3
 
 
 def initialize_screen(allowed: list, width: int, height: int) -> pygame.Surface:
@@ -17,15 +18,6 @@ def initialize_screen(allowed: list, width: int, height: int) -> pygame.Surface:
     pygame.event.set_blocked(None)
     pygame.event.set_allowed([pygame.QUIT] + allowed)
     return screen
-
-
-def load_images() -> dict[int, Image]:
-    """..."""
-    images = [Image("images/zoom0.jpg", 0, 1000, 800, lat_top=43.96036, lat_bottom=43.52434,
-                    lon_left=-79.81884, lon_right=-79.06096),
-              Image("images/zoom1.jpg", 1, 1500, 1200, lat_top=43.96036, lat_bottom=43.52434,
-                    lon_left=-79.81884, lon_right=-79.06096)]
-    return {image.zoom: image for image in images}
 
 
 def load_zoom_image(images: dict[int, Image], zoom: int = 0) -> pygame.Surface:
@@ -101,16 +93,17 @@ def zoom_out(zoom: int) -> int:
         return zoom
 
 
-def can_zoom(zoom: int, max: int, direction: str) -> bool:
+def can_zoom(zoom: int, max_zoom: int, direction: str) -> bool:
     """...
 
     Preconditions:
         - direction in {'in', 'out'}
     """
-    return (direction == 'in' and zoom < max) or (direction == 'out' and zoom > 0)
+    return (direction == 'in' and zoom < max_zoom) or (direction == 'out' and zoom > 0)
 
 
-def run_map(width: int = 800, height: int = 600,
+def run_map(filename: str = "data/image_data/images_data.csv",
+            width: int = 800, height: int = 600,
             lat: float = 43.725163, lon: float = -79.457222) -> None:
     """...
 
@@ -127,7 +120,7 @@ def run_map(width: int = 800, height: int = 600,
     zoom = 0
 
     # load image
-    images = load_images()
+    images = load_images(filename)
     tile = load_zoom_image(images, zoom)
 
     # Start the event loop
@@ -157,7 +150,7 @@ def run_map(width: int = 800, height: int = 600,
             # Zoom out
             if (width - 100) <= mouse_x <= (width - 50) \
                     and (height - 100) <= mouse_y <= (height - 50):
-                if can_zoom(zoom, 1, 'out'):
+                if can_zoom(zoom, MAX_ZOOM, 'out'):
                     zoom = zoom_out(zoom)
                     x, y = 0, 0
                     tile = load_zoom_image(images, zoom)
@@ -165,8 +158,8 @@ def run_map(width: int = 800, height: int = 600,
             # Zoom in
             elif (width - 100) <= mouse_x <= (width - 50) \
                     and (height - 150) <= mouse_y <= (height - 100):  # Check if clicked zoom in
-                if can_zoom(zoom, 1, 'in'):
-                    zoom = zoom_in(zoom, 1)
+                if can_zoom(zoom, MAX_ZOOM, 'in'):
+                    zoom = zoom_in(zoom, MAX_ZOOM)
                     x, y = 0, 0
                     tile = load_zoom_image(images, zoom)
             # elif ...:  # Check if clicked settings (dropdown for time block)
@@ -201,3 +194,10 @@ def run_map(width: int = 800, height: int = 600,
                     y_diff = scroll_diff(y, mouse_y)
                 else:
                     y = new_y
+
+
+if __name__ == "__main__":
+    # pyta
+
+    # run map
+    run_map()

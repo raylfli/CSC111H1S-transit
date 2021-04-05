@@ -9,6 +9,9 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 import numpy as np
 import pandas as pd
 
+# TODO REMOVE BEFORE COMMIT
+import math
+
 # Data source
 from data_dataframes import STOP_TIMES_DF, STOPS_DF
 
@@ -21,8 +24,9 @@ def get_stops() -> set[tuple[np.uint16, tuple[np.float32, np.float32]]]:
         - ``-180 <= longitude <= 180``
     """
     stops = set()
-    for row in STOPS_DF.iterrows():
-        stops.add((row[0], (row[1]['stop_lat'], row[1]['stop_lon'])))
+    for row in STOPS_DF.itertuples():
+        # print(row)
+        stops.add((row[0], (row[3], row[4])))
 
     return stops
 
@@ -37,7 +41,8 @@ def get_edge_weights() -> pd.DataFrame:
         - time_arr (arrival time to the other station)
         - weight (edge weight)
     """
-    cols = ['stop_id_start', 'stop_id_end', 'time_dep', 'time_arr', 'weight']
+    # cols = ['stop_id_start', 'stop_id_end', 'time_dep', 'time_arr', 'weight']
+    cols = ['stop_id_start', 'stop_id_end', 'time_dep', 'time_arr', 'weight', 'dist']
     df = pd.DataFrame(columns=cols)
     temp_storage = []
 
@@ -45,8 +50,8 @@ def get_edge_weights() -> pd.DataFrame:
     # curr_row = None
     next_row = next(stop_times_iterator)
 
-    # for row_num in range(100):  # TODO REMOVE - testing purposes
-    for _ in range(len(STOP_TIMES_DF) - 1):
+    for row_num in range(100):  # TODO REMOVE - testing purposes
+    # for _ in range(len(STOP_TIMES_DF) - 1):
         curr_row = next_row
         next_row = next(stop_times_iterator)
 
@@ -55,8 +60,13 @@ def get_edge_weights() -> pd.DataFrame:
             temp_storage = []
 
         if curr_row[3] + 1 == next_row[3]:  # stop_sequence comparison
+            curr_stop = STOPS_DF.loc[curr_row[2]]
+            next_stop = STOPS_DF.loc[next_row[2]]
             temp_storage.append((curr_row[2], next_row[2], curr_row[1], next_row[1],
-                                 (next_row[1] - curr_row[1]).seconds / 60))
+                                 (next_row[1] - curr_row[1]).seconds / 60,
+                                 distance((curr_stop[2], curr_stop[3]), (next_stop[2], next_stop[3]))
+                                 )
+                                )
 
     df = df.append(pd.DataFrame(temp_storage, columns=cols))
     df.set_index('stop_id_start', inplace=True)
@@ -65,12 +75,31 @@ def get_edge_weights() -> pd.DataFrame:
     return df
 
 
+# TODO TEMP REMOVE BEFORE COMMIT
+def distance(location1: tuple[float, float], location2: tuple[float, float]) -> float:
+    """Great-circle distance between two points location1 and location2, calculated using
+     the haversine formula.
+    location1 and location2 are tuples of coordinates given in degrees north and degrees east.
+    """
+    earth_radius = 6368  # radius of the earth in km
+
+    delta_phi = math.radians(location2[0] - location1[0])
+    delta_lambda = math.radians(location2[1] - location1[1])
+
+    central_angle = 2 * math.asin(math.sqrt((math.sin(delta_phi / 2)) ** 2
+                                            + math.cos(math.radians(location1[0]))
+                                            * math.cos(math.radians(location2[0]))
+                                            * (math.sin(delta_lambda / 2)) ** 2))
+
+    return central_angle * earth_radius
+
+
 if __name__ == '__main__':
     # TODO ADD PYTA CHECK
 
     # pass
     weights = get_edge_weights()
-    weights.to_pickle('data/edge_weights_dump.pkl')
+    # weights.to_pickle('data/edge_weights_dump.pkl')
     # weights = pd.read_pickle('data/edge_weights_dump.pkl')  # TODO REMOVE - pickle dump file
 
     # arr = [list(weights.index), list(weights.stop_id_end), list(weights.time)]

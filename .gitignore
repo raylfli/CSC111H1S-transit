@@ -11,7 +11,7 @@
 **/__pycache__
 
 # Database
-transit.db
+*.db
 
 # Mac Files
 .DS_Store

@@ -1,0 +1,29 @@
+--File Info--
+
+Dimension:    4068x3584px
+Aspect Ratio: 1017:896 ~ 1.135:1
+
+--Tile Info--
+
+Larger X Tile values are towards the right
+Larger Y Tile values are downwards
+
+Min X Tile:   2279
+Max X Tile:   2296
+
+Min Y Tile:   2980
+Max Y Tile:   2993
+
+Zoom Lvl:     13
+
+--Coord Info--
+
+Given in degrees North, degrees East
+Larger Lat values are more northerly
+Larger Lon values are more easterly
+
+Min. Lat:     43.51668853502907
+Max. Lat:     43.96119063892025
+
+Min. Lon:     -79.8486328125
+Max. Lon:     -79.0576171875

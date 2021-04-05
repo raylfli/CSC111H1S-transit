@@ -89,10 +89,10 @@ def init_db(data_dir: str, force: bool = False) -> None:
         data_dir_formatted = data_dir + ('/' if not data_dir.endswith('/') else '')
 
         # insert data
-        _insert_routes_file(data_dir_formatted + 'routes.txt', con)
+        _insert_file(data_dir_formatted + 'routes.txt', 'routes', con)
         _insert_stop_times_file(data_dir_formatted + 'stop_times.txt', con)
-        _insert_stops_file(data_dir_formatted + 'stops.txt', con)
-        _insert_trips_file(data_dir_formatted + 'trips.txt', con)
+        _insert_file(data_dir_formatted + 'stops.txt', 'stops', con)
+        _insert_file(data_dir_formatted + 'trips.txt', 'trips', con)
 
         # compute weights
         _generate_weights(con, force=force)
@@ -101,19 +101,22 @@ def init_db(data_dir: str, force: bool = False) -> None:
         con.close()
 
 
-# TODO MAKE THESE INSERT FUNCTIONS UNIVERSAL (SUCH THAT ONLY ONE IS REQUIRED)
-def _insert_routes_file(file_path: str, con: sqlite3.Connection) -> None:
-    """Insert ``routes.txt`` file from the GTFS static format using the given SQLite connection.
+def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> None:
+    """Insert the specified file into a pre-existing SQLite table in the given Connection.
 
     DOES NOT commit changes.
 
-    Preconditions:
+    Preconditions:  # TODO EDIT IF NEW TABLES
+        - table_name in {'routes', 'stops', 'trips'}
+        - table exists in the SQLite database connection
         - os.isfile(file_path)
+        - specified file includes a header row
     """
     with open(file_path, mode='r') as f:
         reader = csv.reader(f)
-        next(reader)  # skip header row
-        con.executemany("""INSERT INTO routes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", reader)
+        num_cols = len(next(reader))  # skip header row
+        query_str = f'INSERT INTO {table_name} VALUES ({", ".join(["?"] * num_cols)})'
+        con.executemany(query_str, reader)
 
 
 def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
@@ -141,34 +144,6 @@ def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
             con.execute("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
         # con.executemany("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", reader)
-
-
-def _insert_stops_file(file_path: str, con: sqlite3.Connection) -> None:
-    """Insert ``stops.txt`` file from the GTFS static format using the given SQLite connection.
-
-    DOES NOT commit changes.
-
-    Preconditions:
-        - os.isfile(file_path)
-    """
-    with open(file_path, mode='r') as f:
-        reader = csv.reader(f)
-        next(reader)  # skip header row
-        con.executemany("""INSERT INTO stops VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", reader)
-
-
-def _insert_trips_file(file_path: str, con: sqlite3.Connection) -> None:
-    """Insert ``trips.txt`` file from the GTFS static format using the given SQLite connection.
-
-    DOES NOT commit changes.
-
-    Preconditions:
-        - os.isfile(file_path)
-    """
-    with open(file_path, mode='r') as f:
-        reader = csv.reader(f)
-        next(reader)  # skip header row
-        con.executemany("""INSERT INTO trips VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""", reader)
 
 
 def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:

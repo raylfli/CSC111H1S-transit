@@ -10,6 +10,8 @@ import os
 import sqlite3
 
 
+# ---------- DATABASE CREATION ---------- #
+
 def init_db(data_dir: str, force: bool = False) -> None:
     """Initialize a new database in a file called ``transit.db`` containing the GTFS static tables
     from the given data_directory. If one already exists, this function does nothing, but
@@ -143,8 +145,6 @@ def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
                       row[3], row[4], row[5], row[6], row[7], row[8])
             con.execute("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
-        # con.executemany("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", reader)
-
 
 def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
     """Generate edge weights and store in a new table ``weights`` using information from
@@ -166,12 +166,12 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
         CREATE TABLE weights
             (stop_id_start INTEGER,
             stop_id_end INTEGER,
-            time_dep TEXT,
-            time_arr TEXT,
+            time_dep INTEGER, -- time in seconds
+            time_arr INTEGER, -- time in seconds
             weight REAL);
     
-        -- Add index for indexing by start and end stop
-        CREATE INDEX id_stops ON weights (stop_id_start, stop_id_end);
+        -- Add index for indexing by start stop, end stop, and departure time
+        CREATE INDEX id_stops_time ON weights (stop_id_start, stop_id_end, time_dep);
         """)
 
         # get number of rows in stop_times
@@ -196,8 +196,105 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
                 con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?)""", values)
 
 
+# ---------- DATABASE QUERY ---------- #
+
+class TransitQuery:
+    """Used for persisting Transit database connections in order to speed up queries and database
+    operations.
+
+    Connects to the SQLite database in the file ``transit.db``
+
+    data_interface.init_db should be called before creating a TransitQuery object to correctly
+    create the database.
+
+    Instance Attributes:
+        - open: True when the database connection is open, False otherwise
+
+    Representation Invariants:
+        - open is True if and only if the sqlite3.Connection is open
+    """
+    # Private Instance Attributes:
+    #   - _con: sqlite3 Connection object. Should only ever be connected to the ``transit.db`` file
+    open: bool
+    _con: sqlite3.Connection
+
+    def __init__(self) -> None:
+        """Initialize a new QueryDB object.
+        """
+        self._con = sqlite3.connect('transit.db')
+        self.open = True
+
+    def __del__(self) -> None:
+        """Close database connections during object deletion.
+        """
+        self.close()
+
+    def close(self) -> None:
+        """Close database connection.
+        """
+        self._con.close()
+        self.open = False
+
+    def get_stops(self) -> set[tuple[int, tuple[float, float]]]:
+        """Return a set of tuples representing all the stops in the database.
+
+        Returned tuples are in the form: ``(stop_id, (latitude, longitude))`` where
+            - ``-90 <= latitude <= 90``
+            - ``-180 <= longitude <= 180``
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        stops = set()
+        for row in self._con.execute("""SELECT stop_id, stop_lat, stop_lon FROM stops"""):
+            stops.add((row[0], (row[1], row[2])))
+
+        return stops
+
+    def get_edge_weights(self, stop_id_start: int, stop_id_end: int,
+                         time_sec: int) -> list[tuple[int, int, int, int, float]]:
+        """Return a list of the next vehicles to travel between the two stops after the
+        given time (in seconds).
+
+        Returned tuples are in the form: ``(stop_id_start, stop_id_end,
+        time_dep, time_arr, weight)`` where
+            - ``time_dep >= time_sec``
+
+        If there are no edges between the start and end stops, an empty list is returned.
+
+        For example, if you wanted to get the weights for the vehicles to travel between stop 100
+        and stop 200 after 1:00 AM, you would call: ``TransitDB.get_edge_weights(100, 200, 3600)``
+
+        Preconditions:
+            - time_sec >= 0
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        weights = []
+        cur = self._con.execute("""
+        SELECT stop_id_start,
+            stop_id_end,
+            time_dep,
+            time_arr,
+            weight,
+            time_dep - :time AS time_diff
+        FROM weights
+        WHERE 
+            stop_id_start = :start AND
+            stop_id_end = :end AND 
+            time_diff >= 0;
+        """, {'time': time_sec, 'start': stop_id_start, 'end': stop_id_end})
+        for row in cur:
+            weights.append((row[0], row[1], row[2], row[3], row[4]))
+
+        return weights
+
+
 if __name__ == '__main__':
     # TODO ADD PYTA CHECK
 
-    init_db('data/', force=True)
-    # init_db('data/')
+    # init_db('data/', force=True)
+    init_db('data/')
+
+    q = TransitQuery()

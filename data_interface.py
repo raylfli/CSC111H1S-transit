@@ -19,6 +19,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
 
     Preconditions: TODO ADD MORE IF NEEDED
         - os.isfile(data_dir + 'routes.txt')
+        - os.isfile(data_dir + 'shapes.txt')
         - os.isfile(data_dir + 'stop_times.txt')
         - os.isfile(data_dir + 'stops.txt')
         - os.isfile(data_dir + 'trips.txt')
@@ -30,6 +31,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
         if force:  # remove existing files in database
             con.executescript("""
             DROP TABLE IF EXISTS routes;
+            DROP TABLE IF EXISTS shapes;
             DROP TABLE IF EXISTS stop_times;
             DROP TABLE IF EXISTS stops;
             DROP TABLE IF EXISTS trips;
@@ -48,6 +50,13 @@ def init_db(data_dir: str, force: bool = False) -> None:
             route_color TEXT, 
             route_text_color TEXT)
         WITHOUT ROWID;
+        
+        CREATE TABLE shapes
+            (shape_id INTEGER,
+            shape_pt_lat REAL,
+            shape_pt_lon REAL,
+            shape_pt_sequence INTEGER,
+            shape_dist_traveled REAL);
         
         CREATE TABLE stop_times
             (trip_id INTEGER,
@@ -74,7 +83,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
             stop_timezone INTEGER,
             wheelchair_boarding INTEGER)
         WITHOUT ROWID;
-            
+        
         CREATE TABLE trips
             (route_id INTEGER,
             service_id INTEGER,
@@ -92,6 +101,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
 
         # insert data
         _insert_file(data_dir_formatted + 'routes.txt', 'routes', con)
+        _insert_file(data_dir_formatted + 'shapes.txt', 'shapes', con)
         _insert_stop_times_file(data_dir_formatted + 'stop_times.txt', con)
         _insert_file(data_dir_formatted + 'stops.txt', 'stops', con)
         _insert_file(data_dir_formatted + 'trips.txt', 'trips', con)

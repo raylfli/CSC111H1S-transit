@@ -9,6 +9,8 @@ import csv
 import os
 import sqlite3
 
+from typing import Union
+
 
 # ---------- DATABASE CREATION ---------- #
 
@@ -253,6 +255,8 @@ class TransitQuery:
         Returned tuples are in the form: ``(stop_id, (latitude, longitude))`` where
             - ``-90 <= latitude <= 90``
             - ``-180 <= longitude <= 180``
+
+        Raises ConnectionError if database is not connected.
         """
         if not self.open:
             raise ConnectionError('Database is not connected.')
@@ -276,6 +280,8 @@ class TransitQuery:
 
         For example, if you wanted to get the weights for the vehicles to travel between stop 100
         and stop 200 after 1:00 AM, you would call: ``TransitDB.get_edge_weights(100, 200, 3600)``
+
+        Raises ConnectionError if database is not connected.
 
         Preconditions:
             - time_sec >= 0
@@ -302,6 +308,42 @@ class TransitQuery:
             weights.append((row[0], row[1], row[2], row[3], row[4], row[5]))
 
         return weights
+
+    def get_route_info(self, route_id: int) -> dict[str, Union[str, int]]:
+        """Return route info of the given ``route_id``.
+
+        Returned dictionary contains the following keys:
+            - route_short_name: TTC public route code (integer)
+            - route_long_name: full TTC route name (string)
+            - route_type: GTFS defined route_type codes (integer). The TTC transit dataset includes
+                - 0 -> Tram, Streetcar, Light rail
+                - 1 -> Subway, Metro
+                - 3 -> Bus
+            - route_color: hexadecimal route colour (string)
+            - route_text_color: hexadecimal route text colour (string)
+
+        Raises ConnectionError if database is not connected.
+
+        Raises ValueError if no route of the given ``route_id`` exists.
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        cur = self._con.execute("""
+        SELECT route_short_name, route_long_name, route_type, route_color, route_text_color
+        FROM routes
+        WHERE route_id = ?;
+        """, (route_id,))
+        route_info = cur.fetchone()
+
+        if route_info is None:
+            raise ValueError(f'Route with id {route_id} not found.')
+
+        return {'route_short_name': route_info[0],
+                'route_long_name': route_info[1],
+                'route_type': route_info[2],
+                'route_color': route_info[3],
+                'route_text_color': route_info[4]}
 
 
 if __name__ == '__main__':

@@ -309,6 +309,28 @@ class TransitQuery:
 
         return weights
 
+    def get_route_id(self, trip_id: int) -> int:
+        """Return ``route_id`` from the given ``trip_id`.
+
+        Raises ConnectionError if database is not connected.
+
+        Raises ValueError if no trip with the given ``trip_id`` exists.
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        cur = self._con.execute("""
+        SELECT route_id
+        FROM trips
+        WHERE trip_id = ?;
+        """, (trip_id,))
+        route_info = cur.fetchone()
+
+        if route_info is None:
+            raise ValueError(f'Trip with id {trip_id} not found.')
+
+        return route_info[0]
+
     def get_route_info(self, route_id: int) -> dict[str, Union[str, int]]:
         """Return route info of the given ``route_id``.
 

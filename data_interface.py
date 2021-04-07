@@ -174,7 +174,8 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
         # create table
         con.executescript("""
         CREATE TABLE weights
-            (stop_id_start INTEGER,
+            (trip_id INTEGER,
+            stop_id_start INTEGER,
             stop_id_end INTEGER,
             time_dep INTEGER, -- time in seconds
             time_arr INTEGER, -- time in seconds
@@ -189,7 +190,7 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
 
         # compute weights and add
         cur = con.execute("""
-        SELECT arrival_time, departure_time, stop_id, stop_sequence 
+        SELECT trip_id, arrival_time, departure_time, stop_id, stop_sequence 
         FROM stop_times;
         """)
         next_row = cur.fetchone()
@@ -198,12 +199,13 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
             next_row = cur.fetchone()
 
             # check for continued sequence
-            if curr_row[3] + 1 == next_row[3]:
-                values = (curr_row[2], next_row[2],
-                          curr_row[1], next_row[0],
-                          next_row[0] - curr_row[1])
+            if curr_row[0] == next_row[0]:
+                values = (curr_row[0],  # trip_id
+                          curr_row[3], next_row[3],  # stop_ids
+                          curr_row[2], next_row[1],  # dep/arr time
+                          next_row[1] - curr_row[2])
 
-                con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?)""", values)
+                con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?, ?)""", values)
 
 
 # ---------- DATABASE QUERY ---------- #

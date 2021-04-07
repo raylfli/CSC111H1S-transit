@@ -264,11 +264,11 @@ class TransitQuery:
         return stops
 
     def get_edge_weights(self, stop_id_start: int, stop_id_end: int,
-                         time_sec: int) -> list[tuple[int, int, int, int, float]]:
+                         time_sec: int) -> list[tuple[int, int, int, int, int, float]]:
         """Return a list of the next vehicles to travel between the two stops after the
         given time (in seconds).
 
-        Returned tuples are in the form: ``(stop_id_start, stop_id_end,
+        Returned tuples are in the form: ``(trip_id, stop_id_start, stop_id_end,
         time_dep, time_arr, weight)`` where
             - ``time_dep >= time_sec``
 
@@ -285,7 +285,8 @@ class TransitQuery:
 
         weights = []
         cur = self._con.execute("""
-        SELECT stop_id_start,
+        SELECT trip_id,
+            stop_id_start,
             stop_id_end,
             time_dep,
             time_arr,
@@ -298,7 +299,7 @@ class TransitQuery:
             time_diff >= 0;
         """, {'time': time_sec, 'start': stop_id_start, 'end': stop_id_end})
         for row in cur:
-            weights.append((row[0], row[1], row[2], row[3], row[4]))
+            weights.append((row[0], row[1], row[2], row[3], row[4], row[5]))
 
         return weights
 

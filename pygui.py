@@ -1,0 +1,182 @@
+"""Pygame UI classes"""
+from typing import Union, Optional
+
+import pygame
+
+
+class Rect:
+    """It's a rectangle. Please refer to kindergarten for detailed explanation.
+
+    (x, y) is the coordinate of the top left corner.
+    """
+
+    x: int
+    y: int
+    width: int
+    height: int
+
+    def __init__(self, x: int, y: int, width: int, height: int):
+        self.x, self.y, self.width, self.height = x, y, width, height
+
+    def contains(self, x: int, y: int) -> bool:
+        """Returns whether this rectangle contains the point (x, y).
+
+        Points that are on the edges are not considered inside the rectangle.
+        """
+        return self.x < x < self.x + self.width and self.y < y < self.y + self.height
+
+
+class PygButton:
+    """A clickable button."""
+
+    _rect: Rect
+    _bg_color: Optional[pygame.Color]
+    _image: Optional[pygame.Surface]
+    _image_mode: int
+
+    def __init__(self, x: int = 0, y: int = 0, width: int = 0, height: int = 0,
+                 color: tuple[int, int, int] = None, image: str = None, image_mode: int = 0):
+        """Initialize a button. Customizable background colour, image.
+
+        Image modes:
+            - 0 if you wish for the image to be resized to the button's size (default)
+            - 1 if you wish to display the image at native resolution. The image will be anchored
+                at its top left corner, and any overflow will be clipped.
+        """
+        self._rect = Rect(x, y, width, height)
+        self._image_mode = image_mode
+
+        if color is not None:
+            self._bg_color = pygame.Color(color)
+        else:
+            self._bg_color = None
+
+        if image is not None:
+            self._image = pygame.image.load(image)
+            if image_mode == 0:
+                self._image = pygame.transform.scale(self._image,
+                                                     (self._rect.width, self._rect.height))
+        else:
+            self._image = None
+
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
+        """Draw this button."""
+        if self._bg_color is not None:
+            pygame.draw.rect(surface, self._bg_color,
+                             (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
+
+        if self._image is not None:
+            if self._image_mode == 1:
+                surface.blit(self._image, (self._rect.x, self._rect.y),
+                             pygame.Rect(0, 0, self._rect.width, self._rect.height))
+
+    def on_click(self, event: pygame.event.Event) -> bool:
+        """Return true if the event clicked this button."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = pygame.mouse.get_pos()
+            return self._rect.contains(x, y)
+        return False
+
+
+class PygDropdown:
+    """A dropdown menu."""
+    selected: str
+
+    _rect: Rect
+    _stack_rect: Rect
+    _active: bool
+
+    _font: pygame.font.Font
+
+    _option_surfs: dict[str, pygame.Surface]
+    _option_nums: dict[int, str]
+
+    _field_col: pygame.Color
+    _dropdown_col: pygame.Color
+
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 options: list[str], font: tuple[str, int],
+                 txt_col: tuple[int, int, int] = (0, 0, 0),
+                 field_col: tuple[int, int, int] = (255, 255, 255),
+                 dropdown_col: tuple[int, int, int] = (255, 255, 255)):
+        """Initialize this menu. The options in this menu are given as a list of strings. The
+        dropdown menu defaults to the first item in the list.
+
+        Fonts are given as a tuple of font name and size.
+        """
+        self._rect = Rect(x, y, width, height)
+        self._stack_rect = Rect(x, y, width, height * len(options))
+        self._active = False
+        self._font = pygame.font.SysFont(font[0], font[1])
+        self._field_col = pygame.Color(field_col)
+        self._dropdown_col = pygame.Color(dropdown_col)
+
+        self.selected = options[0]
+
+        self._option_surfs = {}
+        self._option_nums = {}
+        option_num = 1
+        for option in options:
+            self._option_surfs[option] = self._font.render(option, True, txt_col)
+            self._option_nums[option_num] = option
+
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
+        """Draw this menu."""
+        if self._active:
+            # draw field
+            pygame.draw.rect(surface, self._field_col,
+                             (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
+            height = self._option_surfs[self.selected].get_size()[1]
+            surface.blit(self._option_surfs[self.selected], (self._rect.x,
+                                                             max(self._rect.y, self._rect.y +
+                                                                 self._rect.height - height)),
+                         pygame.Rect(0, max(0, height - self._rect.height),
+                                     self._rect.width, self._rect.height))
+
+            # draw dropdowns
+            for option in self._option_nums:
+                if self._option_nums[option] != self.selected:
+                    self._draw_option(self._option_nums[option], option, surface)
+        else:
+            pygame.draw.rect(surface, self._field_col,
+                             (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
+            height = self._option_surfs[self.selected].get_size()[1]
+            surface.blit(self._option_surfs[self.selected], (self._rect.x,
+                                                             max(self._rect.y, self._rect.y +
+                                                                 self._rect.height - height)),
+                         pygame.Rect(0, max(0, height - self._rect.height),
+                                     self._rect.width, self._rect.height))
+
+    def _draw_option(self, option: str, option_num: int,
+                     surface: Union[pygame.Surface, pygame.SurfaceType]):
+        """Draw a single option."""
+        y = self._rect.y + self._rect.height * option_num
+        pygame.draw.rect(surface, self._dropdown_col,
+                         (self._rect.x, y, self._rect.width, self._rect.height))
+        height = self._option_surfs[option].get_size()[1]
+        surface.blit(self._option_surfs[option], (self._rect.x,
+                                                  max(y, y + self._rect.height - height)),
+                     pygame.Rect(0, max(0, height - self._rect.height),
+                                 self._rect.width, self._rect.height))
+
+    def on_select(self, event: pygame.event.Event):
+        """On select, either activates or deactivates this dropdown. The activated dropdown
+        allows the selection of a new option."""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            x, y = pygame.mouse.get_pos()
+            if not self._active and self._rect.contains(x, y):
+                option_num = 1
+                for option in self._option_surfs:
+                    if option != self.selected:
+                        self._option_nums[option_num] = option
+                        option_num += 1
+                self._active = True
+            else:  # is active
+                if self._stack_rect.contains(x, y):
+                    num = (y - self._rect.y) // self._rect.height
+                    if num > 0:
+                        self.selected = self._option_nums[num]
+                    self._active = False
+                else:
+                    # print('deactivate')
+                    self._active = False

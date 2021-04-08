@@ -181,10 +181,13 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
             stop_id_end INTEGER,
             time_dep INTEGER, -- time in seconds
             time_arr INTEGER, -- time in seconds
-            weight REAL);
+            weight REAL,
+            shape_dist_traveled_start REAL DEFAULT 0 ,
+            shape_dist_traveled_end REAL DEFAULT 0);
     
         -- Add index for indexing by start stop, end stop, and departure time
         CREATE INDEX id_stops_time ON weights (stop_id_start, stop_id_end, time_dep);
+        CREATE INDEX id_trip_stops ON weights (trip_id, stop_id_start, stop_id_end);
         """)
 
         # get number of rows in stop_times
@@ -192,7 +195,7 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
 
         # compute weights and add
         cur = con.execute("""
-        SELECT trip_id, arrival_time, departure_time, stop_id, stop_sequence 
+        SELECT trip_id, arrival_time, departure_time, stop_id, stop_sequence, shape_dist_traveled
         FROM stop_times;
         """)
         next_row = cur.fetchone()
@@ -205,9 +208,12 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
                 values = (curr_row[0],  # trip_id
                           curr_row[3], next_row[3],  # stop_ids
                           curr_row[2], next_row[1],  # dep/arr time
-                          next_row[1] - curr_row[2])
+                          next_row[1] - curr_row[2],  # weight
+                          curr_row[5],  # shape_dist_traveled
+                          next_row[5]  # shape_dist_traveled
+                          )
 
-                con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?, ?)""", values)
+                con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
 
 # ---------- DATABASE QUERY ---------- #
@@ -366,6 +372,67 @@ class TransitQuery:
                 'route_type': route_info[2],
                 'route_color': route_info[3],
                 'route_text_color': route_info[4]}
+
+    def get_shape_data(self, trip_id: int,
+                       stop_id_start: int,
+                       stop_id_end) -> dict[str, Union[int, list[tuple[float, float]]]]:
+        """Return the ``route_id`` and shape data between the two given stops.
+
+        Shape data is used to plot points in between each of the stops.
+
+        Returned dictionary contains the following keys:
+            - route_id: ``route_id`` of the traveled path between two stops (int)
+            - shape: list of ``tuple[float, float]`` containing the shape/path as
+            (latitude, longitude) between the given stops
+
+        Raises ConnectionError if database is not connected.
+
+        Raises ValueError if no trip between the two stops exist.
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        shape_dist = self._con.execute("""
+        SELECT shape_dist_traveled_start, shape_dist_traveled_end 
+        FROM weights
+        WHERE 
+            trip_id = :t_id AND 
+            stop_id_start = :s_id_start AND
+            stop_id_end = :s_id_end;
+        """, {'t_id': trip_id, 's_id_start': stop_id_start, 's_id_end': stop_id_end}).fetchone()
+
+        if shape_dist is None:
+            raise ValueError(f'Trip with id {trip_id} and '
+                             f'stop id {stop_id_start} to id {stop_id_end} not found.')
+
+        route_id, shape_id = self._con.execute("""
+        SELECT route_id, shape_id
+        FROM trips
+        WHERE trip_id = ?
+        """, (trip_id,)).fetchone()
+
+        shape_coords_cursor = self._con.execute("""
+        SELECT shape_pt_lat, shape_pt_lon
+        FROM shapes
+        WHERE 
+            shape_id = :s_id AND
+            shape_dist_traveled BETWEEN :s_dist_start AND :s_dist_end;
+        """, {'s_id': shape_id, 's_dist_start': shape_dist[0], 's_dist_end': shape_dist[1]})
+
+        stop_start_coords = self._con.execute("""
+        SELECT stop_lat, stop_lon
+        FROM stops
+        WHERE stop_id = ?
+        """, (stop_id_start,)).fetchone()
+
+        stop_end_coords = self._con.execute("""
+        SELECT stop_lat, stop_lon
+        FROM stops
+        WHERE stop_id = ?
+        """, (stop_id_end,)).fetchone()
+
+        return {'route_id': route_id,
+                'shape': [stop_start_coords] + shape_coords_cursor.fetchmany() + [stop_end_coords]}
 
 
 if __name__ == '__main__':

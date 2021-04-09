@@ -9,6 +9,8 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 from __future__ import annotations
 from typing import Any
 
+import data_interface
+
 
 class _Vertex:
     """A vertex in a transit system graph, used to represent a stop.
@@ -73,6 +75,22 @@ class Graph:
             v1.neighbours.add(v2)
         else:
             raise ValueError
+
+    def get_weight(self, item1: Any, item2: Any, time_sec: int, q: data_interface.TransitQuery()) \
+            -> list[tuple[int, int, float]]:
+        """Return the weight of the edge between the given items.
+
+        Return 0 if item1 and item2 are not adjacent.
+
+        Preconditions:
+            - item1 and item2 are vertices in this graph
+        """
+        weights = []
+
+        for edge_weight in q.get_edge_weights(item1, item2, time_sec):
+            weights.append((edge_weight[2], edge_weight[3], edge_weight[4]))
+
+        return weights
 
     def adjacent(self, item1: Any, item2: Any) -> bool:
         """Return whether item1 and item2 are adjacent vertices in this graph.

@@ -87,8 +87,9 @@ class Graph:
         """
         weights = []
 
+        # appends list of tuples in the form: (trip_id, time_dep, time_arr, weight)
         for edge_weight in q.get_edge_weights(item1, item2, time_sec):
-            weights.append((edge_weight[2], edge_weight[3], edge_weight[4]))
+            weights.append((edge_weight[0], edge_weight[3], edge_weight[4], edge_weight[5]))
 
         return weights
 

@@ -1,4 +1,16 @@
-"""..."""
+"""
+
+To-do:
+    - Add dropdown to choose time
+    - Add location chooser (start, end)
+    - Pass location to backend for path finding
+    - Get path from locations chosen (get from backend)
+    - Display path (draw lines for path)
+    - Display sidebar for path info
+    - Get larger zoom images
+    - Create button class (for zoom and dropdown)
+
+"""
 import pygame
 from image import Image, load_images
 from typing import Union
@@ -6,6 +18,17 @@ from typing import Union
 ALLOWED = [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
            pygame.MOUSEMOTION, pygame.KEYDOWN]
 MAX_ZOOM = 3
+TEST_POINTS = [(43.74735, -79.1994),
+               (43.81984, -79.21122),
+               (43.768204, -79.412796),
+               (43.684044, -79.3207),
+               (43.828785, -79.275375),
+               (43.708115, -79.31103),
+               (43.680065, -79.34497),
+               (43.785343, -79.31073),
+               (43.698895, -79.4398),
+               (43.69683, -79.4914)
+               ]
 
 
 def initialize_screen(allowed: list, width: int, height: int) -> pygame.Surface:
@@ -54,11 +77,13 @@ def draw_settings(screen: pygame.Surface) -> None:
     # Draw original box
 
 
-def draw_waypoints(screen: pygame.Surface, image: Image, lat: float, lon: float,
+def draw_waypoints(screen: pygame.Surface, image: Image, waypoints: list[tuple],
                    orig_x: int, orig_y: int) -> None:
     """dkm this isn't acc drawing waypoints"""
-    x, y = image.lat_lon_to_coord(lat, lon)
-    pygame.draw.circle(screen, pygame.Color('black'), (orig_x + x, orig_y + y), 4)
+    for lat_lon in waypoints:
+        lat, lon = lat_lon
+        x, y = image.lat_lon_to_coord(lat, lon)
+        pygame.draw.circle(screen, pygame.Color('black'), (orig_x + x, orig_y + y), 4)
 
 
 def scroll_diff(p: int, mouse_p) -> int:
@@ -77,34 +102,13 @@ def continue_scroll(image: Image, width: int, height: int, x: int, y: int,
         return x, y
 
 
-def zoom_in(zoom: int, max: int) -> int:
+def clamp(num, min_value: int = 0, max_value: int = 3):
     """..."""
-    if zoom < max:
-        return zoom + 1
-    else:
-        return zoom
-
-
-def zoom_out(zoom: int) -> int:
-    """..."""
-    if zoom > 0:
-        return zoom - 1
-    else:
-        return zoom
-
-
-def can_zoom(zoom: int, max_zoom: int, direction: str) -> bool:
-    """...
-
-    Preconditions:
-        - direction in {'in', 'out'}
-    """
-    return (direction == 'in' and zoom < max_zoom) or (direction == 'out' and zoom > 0)
+    return max(min(num, max_value), min_value)
 
 
 def run_map(filename: str = "data/image_data/images_data.csv",
-            width: int = 800, height: int = 600,
-            lat: float = 43.725163, lon: float = -79.457222) -> None:
+            width: int = 800, height: int = 600) -> None:
     """...
 
     Preconditions:
@@ -128,7 +132,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         # Display
         draw_map(screen, tile, x, y)
         draw_zoom(screen, width, height)
-        draw_waypoints(screen, images[zoom], lat, lon, x, y)
+        draw_waypoints(screen, images[zoom], TEST_POINTS, x, y)
         pygame.display.flip()
 
         # ---------------------------------------------------------------
@@ -150,21 +154,20 @@ def run_map(filename: str = "data/image_data/images_data.csv",
             # Zoom out
             if (width - 100) <= mouse_x <= (width - 50) \
                     and (height - 100) <= mouse_y <= (height - 50):
-                if can_zoom(zoom, MAX_ZOOM, 'out'):
-                    zoom = zoom_out(zoom)
+                if clamp(zoom + 1) != zoom:
+                    zoom = clamp(zoom + 1)
                     x, y = 0, 0
                     tile = load_zoom_image(images, zoom)
 
             # Zoom in
             elif (width - 100) <= mouse_x <= (width - 50) \
                     and (height - 150) <= mouse_y <= (height - 100):  # Check if clicked zoom in
-                if can_zoom(zoom, MAX_ZOOM, 'in'):
-                    zoom = zoom_in(zoom, MAX_ZOOM)
+                if clamp(zoom - 1) != zoom:
+                    zoom = clamp(zoom - 1)
                     x, y = 0, 0
                     tile = load_zoom_image(images, zoom)
+
             # elif ...:  # Check if clicked settings (dropdown for time block)
-            #     ...
-            # elif ...:  # Check if clicked waypoint
             #     ...
 
             # Clicked point or scroll

@@ -15,3 +15,16 @@ class _Waypoint:
         self.long = long
         self.chosen_start = chosen_start
         self.chosen_end = chosen_end
+
+
+def load_waypoints() -> tuple:
+    """..."""
+
+
+def load_path() -> list:
+    """..."""
+
+
+if __name__ == "__main__":
+    # pyta
+    ...

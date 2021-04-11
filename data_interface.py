@@ -21,6 +21,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
     if ``force is True``, this function will overwrite tables in the ``transit.db`` file.
 
     Preconditions: TODO ADD MORE IF NEEDED
+        - os.isfile(data_dir + 'calendar.txt')
         - os.isfile(data_dir + 'routes.txt')
         - os.isfile(data_dir + 'shapes.txt')
         - os.isfile(data_dir + 'stop_times.txt')
@@ -33,6 +34,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
 
         if force:  # remove existing files in database
             con.executescript("""
+            DROP TABLE IF EXISTS calendar;
             DROP TABLE IF EXISTS routes;
             DROP TABLE IF EXISTS shapes;
             DROP TABLE IF EXISTS stop_times;
@@ -42,6 +44,19 @@ def init_db(data_dir: str, force: bool = False) -> None:
 
         # create tables corresponding to GTFS files
         con.executescript("""
+        CREATE TABLE calendar
+            (service_id INTEGER PRIMARY KEY ASC UNIQUE, 
+            monday INTEGER, 
+            tuesday INTEGER, 
+            wednesday INTEGER, 
+            thursday INTEGER, 
+            friday INTEGER, 
+            saturday INTEGER, 
+            sunday INTEGER, 
+            start_date TEXT, 
+            end_date TEXT)
+        WITHOUT ROWID;
+        
         CREATE TABLE routes 
             (route_id INTEGER PRIMARY KEY ASC UNIQUE, 
             agency_id INTEGER, 
@@ -103,6 +118,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
         data_dir_formatted = data_dir + ('/' if not data_dir.endswith('/') else '')
 
         # insert data
+        _insert_file(data_dir_formatted + 'calendar.txt', 'calendar', con)
         _insert_file(data_dir_formatted + 'routes.txt', 'routes', con)
         _insert_file(data_dir_formatted + 'shapes.txt', 'shapes', con)
         _insert_stop_times_file(data_dir_formatted + 'stop_times.txt', con)
@@ -122,7 +138,7 @@ def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> No
     DOES NOT commit changes.
 
     Preconditions:  # TODO EDIT IF NEW TABLES
-        - table_name in {'routes', 'stops', 'trips'}
+        - table_name in {'calendar', 'routes', 'shapes', 'stops', 'trips'}
         - table exists in the SQLite database connection
         - os.isfile(file_path)
         - specified file includes a header row

@@ -17,6 +17,7 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 
 import data_interface
 from graph import Graph
+from pathfinding import a_star
 
 
 def load_graph() -> Graph():
@@ -29,7 +30,7 @@ def load_graph() -> Graph():
     Edges represent a one-way connection between two existing stops.
     """
     g = Graph()
-    data_interface.init_db('data/')
+    data_interface.init_db('data/', force=True)
     q = data_interface.TransitQuery()
 
     for vertex in q.get_stops():
@@ -43,16 +44,19 @@ def load_graph() -> Graph():
 
 if __name__ == '__main__':
 
-    load_graph()
+    g = load_graph()
     # todo complete this section
 
-    import python_ta
-    # todo modify the PyTA check
+    q = data_interface.TransitQuery()
+    print(a_star(g.get_vertex(14155), g.get_vertex(6904), 62429, g, q))
 
-    python_ta.check_all(config={
-        'max-line-length': 1000,
-        'disable': ['E1136'],
-        'extra-imports': ['csv', 'networkx'],
-        'allowed-io': ['load_review_graph'],
-        'max-nested-blocks': 4
-    })
+    # import python_ta
+    # # todo modify the PyTA check
+    #
+    # python_ta.check_all(config={
+    #     'max-line-length': 1000,
+    #     'disable': ['E1136'],
+    #     'extra-imports': ['csv', 'networkx'],
+    #     'allowed-io': ['load_review_graph'],
+    #     'max-nested-blocks': 4
+    # })

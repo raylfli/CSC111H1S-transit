@@ -77,7 +77,7 @@ class Graph:
             raise ValueError
 
     def get_weight(self, item1: Any, item2: Any, time_sec: int, q: data_interface.TransitQuery()) \
-            -> list[tuple[int, int, float]]:
+            -> list[tuple[int, int, int, float]]:
         """Return the weight of the edge between the given items.
 
         Return 0 if item1 and item2 are not adjacent.
@@ -103,6 +103,10 @@ class Graph:
             return any(v2.item == item2 for v2 in v1.neighbours)
         else:
             return False
+
+    def get_vertex(self, item: Any) -> _Vertex:
+        """Return a vertex given an item (stop_id)."""
+        return self._vertices[item]
 
     def get_neighbours(self, item: Any) -> set:
         """Return a set of the neighbours of the given item.

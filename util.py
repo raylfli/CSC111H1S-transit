@@ -2,8 +2,6 @@
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
-
-
 import math
 
 

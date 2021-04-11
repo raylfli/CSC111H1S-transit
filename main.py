@@ -29,10 +29,14 @@ def load_graph() -> Graph():
     Edges represent a one-way connection between two existing stops.
     """
     g = Graph()
-    vertices = data_interface.get_stops()
+    data_interface.init_db('data/')
+    q = data_interface.TransitQuery()
 
-    for vertex in vertices:
+    for vertex in q.get_stops():
         g.add_vertex(vertex[0], vertex[1])
+
+    for edge in q.get_edges():
+        g.add_edge(edge[0], edge[1])
 
     return g
 

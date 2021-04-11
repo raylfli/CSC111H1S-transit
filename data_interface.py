@@ -273,7 +273,7 @@ class TransitQuery:
 
         return stops
 
-    def get_edges(self) -> set[tuple[str, str]]:
+    def get_edges(self) -> set[tuple[int, int]]:
         """Return a set of tuples representing directed edges between stops.
 
         Returned tuples are in the form: ``(stop_id_start, stop_id_end)``.
@@ -318,13 +318,14 @@ class TransitQuery:
             stop_id_end,
             time_dep,
             time_arr,
-            weight,
-            time_dep - :time AS time_diff
+            weight
         FROM weights
         WHERE 
             stop_id_start = :start AND
             stop_id_end = :end AND 
-            time_diff >= 0;
+            time_dep >= :time
+        ORDER BY
+            time_dep ASC;
         """, {'time': time_sec, 'start': stop_id_start, 'end': stop_id_end})
         for row in cur:
             weights.append((row[0], row[1], row[2], row[3], row[4], row[5]))

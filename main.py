@@ -30,7 +30,7 @@ def load_graph() -> Graph():
     Edges represent a one-way connection between two existing stops.
     """
     g = Graph()
-    data_interface.init_db('data/', force=True)
+    data_interface.init_db('data/')
     q = data_interface.TransitQuery()
 
     for vertex in q.get_stops():
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     # todo complete this section
 
     q = data_interface.TransitQuery()
-    print(a_star(g.get_vertex(14155), g.get_vertex(6904), 62429, g, q))
+    print(a_star(g.get_vertex(14155), g.get_vertex(2160), 62429, g, q))
 
     # import python_ta
     # # todo modify the PyTA check

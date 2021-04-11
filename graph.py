@@ -25,7 +25,7 @@ class _Vertex:
         - all(self in u.neighbours for u in self.neighbours)
     """
     item: Any
-    location: tuple[int, int]
+    location: tuple[float, float]
     neighbours: set[_Vertex]
 
     def __init__(self, item: Any, location: tuple) -> None:

@@ -32,6 +32,8 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, graph: Graph, query: Transi
     open_set = PriorityQueue()
     open_set.put((h(start, goal), start))
 
+    test = []
+
     # For a stop_id n, path_bin[n] is the information for the trip/edge connecting it to the
     # previous node. The information is given as a tuple: (trip_id, start stop_id, end stop_id)
     path_bin = {}
@@ -40,31 +42,31 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, graph: Graph, query: Transi
     g_score = defaultdict(lambda: inf)
     g_score[start] = 0
 
-    curr_time = time
-
     while not open_set.empty():
         curr = open_set.get()[1]
 
         if curr == goal:
-            return reconstruct_path(path_bin, curr.item)
-
+            return construct_path(path_bin, curr.item)
         for neighbour in curr.neighbours:
             # (trip_id, time_dep, time_arr, weight)
-            edge = graph.get_weight(curr, neighbour, curr_time, query)[0]
-            edge_weight = edge[3]  # distance(curr, neighbour)  # TODO change to shape distance
-            temp_gscore = g_score[curr] + edge_weight
+            t = time if curr.item not in path_bin else path_bin[curr.item][3]
+            temp_edge = graph.get_weight(curr.item, neighbour.item, t, query)
+            if len(temp_edge) > 0:
+                edge = temp_edge[0]
+                # optimize for both distance between stops and time taken to reach next stop
+                edge_weight = distance(curr.location, neighbour.location) * (edge[2] - t)
+                temp_gscore = g_score[curr] + edge_weight
 
-            if temp_gscore < g_score[neighbour]:
-                # record optimum path
-                path_bin[neighbour.item] = (edge[0], curr.item, neighbour.item)
-                g_score[neighbour] = temp_gscore  # update g_score for neighbour
+                if temp_gscore < g_score[neighbour]:
+                    # record optimum path
+                    path_bin[neighbour.item] = (edge[0], curr.item, neighbour.item, edge[2])
+                    g_score[neighbour] = temp_gscore  # update g_score for neighbour
 
-                # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
-                # node removed from open_set is guaranteed to be optimal. Then by extension we know
-                # we are not pushing any duplicate nodes.
-                f_score = g_score[neighbour] + h(curr, goal)
-                open_set.put((f_score, neighbour))
-                curr_time = edge[2]
+                    # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
+                    # node removed from open_set is guaranteed to be optimal. Then by extension we know
+                    # we are not pushing any duplicate nodes.
+                    f_score = g_score[neighbour] + h(curr, goal)
+                    open_set.put((f_score, neighbour))
 
 
 def h(curr: _Vertex, goal: _Vertex) -> float:
@@ -76,16 +78,16 @@ def h(curr: _Vertex, goal: _Vertex) -> float:
     return distance(curr.location, goal.location)
 
 
-def construct_path(path_bin: dict[int, tuple[int, int, int]], goal_id: int)\
+def construct_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)\
         -> list[tuple[int, int, int]]:
     """Return a path constructed using path_bin. Note that the path returned is in reverse order:
     the first element is the final stop.
     """
-    path = [goal_id]
+    path = [path_bin[goal_id]]
 
-    id = goal_id
+    id = path_bin[goal_id][1]
     while id in path_bin.keys():
+        path.append(path_bin[id][:3])
         id = path_bin[id][1]
-        path.append(path_bin[id])
 
     return path

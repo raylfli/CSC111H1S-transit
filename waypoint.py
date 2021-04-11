@@ -1,10 +1,10 @@
 """..."""
 
 
-class _Waypoint:
+class Waypoint:
     """..."""
     lat: float
-    long: float
+    lon: float
     chosen_start: bool
     chosen_end: bool
 
@@ -12,17 +12,13 @@ class _Waypoint:
                  chosen_start: bool = False, chosen_end: bool = False) -> None:
         """..."""
         self.lat = lat
-        self.long = long
+        self.lon = long
         self.chosen_start = chosen_start
         self.chosen_end = chosen_end
 
-
-def load_waypoints() -> tuple:
-    """..."""
-
-
-def load_path() -> list:
-    """..."""
+    def get_lat_lon(self) -> tuple[float, float]:
+        """..."""
+        return (self.lat, self.lon)
 
 
 if __name__ == "__main__":

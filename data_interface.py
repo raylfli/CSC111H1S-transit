@@ -8,6 +8,7 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 import csv
 import os
 import sqlite3
+import math
 
 from typing import Union
 
@@ -244,6 +245,11 @@ class TransitQuery:
         self._con = sqlite3.connect('transit.db')
         self.open = True
 
+        # create distance function
+        self._con.create_function('DIST', 2,
+                                  lambda a, b: math.sqrt(a ** 2 + b ** 2),
+                                  deterministic=True)
+
     def __del__(self) -> None:
         """Close database connections during object deletion.
         """
@@ -288,6 +294,28 @@ class TransitQuery:
             edges.add((row[0], row[1]))
 
         return edges
+
+    def get_closest_stop(self, lat: float, lon: float) -> int:
+        """Return the ``stop_id`` of the closest stop to the given latitude and longitude.
+
+        This function disregards a curved Earth, and simply subtracts the latitude and longitude
+        to compute the closest stop.
+
+        Raises ConnectionError if database is not connected.
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        cur = self._con.execute("""
+        SELECT 
+            stop_id, 
+            stop_lat - ? AS diff_lat, 
+            stop_lon - ? AS diff_lon
+        FROM stops
+        ORDER BY DIST(diff_lat, diff_lon) ASC 
+        """, (lat, lon))
+
+        return cur.fetchone()[0]
 
     def get_edge_weights(self, stop_id_start: int, stop_id_end: int,
                          time_sec: int) -> list[tuple[int, int, int, float]]:

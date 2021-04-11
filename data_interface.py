@@ -327,7 +327,8 @@ class TransitQuery:
             stop_lat - ? AS diff_lat, 
             stop_lon - ? AS diff_lon
         FROM stops
-        ORDER BY DIST(diff_lat, diff_lon) ASC 
+        ORDER BY 
+            DIST(diff_lat, diff_lon) ASC
         """, (lat, lon))
 
         return cur.fetchone()[0]

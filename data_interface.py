@@ -40,6 +40,8 @@ def init_db(data_dir: str, force: bool = False) -> None:
             DROP TABLE IF EXISTS stop_times;
             DROP TABLE IF EXISTS stops;
             DROP TABLE IF EXISTS trips;
+            
+            VACUUM;
             """)
 
         # create tables corresponding to GTFS files

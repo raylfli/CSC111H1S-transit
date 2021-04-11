@@ -12,6 +12,7 @@ import pygame
 from image import Image, load_images
 from pygui import PygButton, PygDropdown
 from waypoint import Waypoint
+from path import Path
 from typing import Union
 
 ALLOWED = [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
@@ -23,7 +24,6 @@ SETTINGS = 'settings'
 GET_PATH = 'path'
 PATH_TEXT = 'Get path'
 RESET_PATH_TEXT = 'Reset'
-# TIME_TEXT = [str(x) for x in range(0, 24)]
 DAYS_TEXT = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 
@@ -107,6 +107,12 @@ def draw_waypoint(screen: pygame.Surface, image: Image,
     pygame.draw.circle(screen, pygame.Color('black'), (x, y), 4)
 
 
+def draw_path(screen: pygame.Surface, image: Image,
+              path: Path, orig_x: int, orig_y: int) -> None:
+    """Draw path."""
+    path.draw(screen, image, orig_x, orig_y)
+
+
 def scroll_diff(p: int, mouse_p) -> int:
     """..."""
     return p - mouse_p
@@ -147,6 +153,16 @@ def reset_points(button: PygButton, dropdown: PygDropdown) -> dict:
     return {'selected': dropdown.selected, 'pts': []}
 
 
+def time_to_sec(time: list[int]) -> int:
+    """Return the number of seconds after midnight from a given time.
+
+    Preconditions:
+        - len(time) == 3
+    """
+    hour, minute, second = time[0], time[1], time[2]
+    return hour * 3600 + minute * 60 + second
+
+
 def run_map(filename: str = "data/image_data/images_data.csv",
             width: int = 800, height: int = 600,
             button_width: int = 50, button_height: int = 50) -> None:
@@ -160,10 +176,12 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     """
     screen = initialize_screen(ALLOWED, width, height)
     x, y = 0, 0
-    scroll = False
+    down, scroll = False, False
+    reset, clicked = False, False
+    show_path = False
     x_diff, y_diff = 0, 0
     zoom = 0
-    waypoints = {'selected': DAYS_TEXT[0], 'pts': []}
+    waypoints = {'day': DAYS_TEXT[0], 'time': (0, 0, 0), 'pts': []}
     buttons = {ZOOM: [PygButton(x=width - PADDING - button_width,
                                 y=height - PADDING - 2 * button_height,
                                 width=button_width, height=button_height),
@@ -172,7 +190,16 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                                 width=button_width, height=button_height)],
                SETTINGS: [PygDropdown(x=PADDING, y=PADDING,
                                       width=PADDING * 2, height=PADDING // 2,
-                                      options=DAYS_TEXT)],
+                                      options=DAYS_TEXT),
+                          PygDropdown(x=PADDING * 4, y=PADDING,
+                                      width=PADDING, height=PADDING // 2,
+                                      options=[str(x) for x in range(0, 23)]),
+                          PygDropdown(x=PADDING * 5, y=PADDING,
+                                      width=PADDING, height=PADDING // 2,
+                                      options=[str(x) for x in range(0, 59)]),
+                          PygDropdown(x=PADDING * 6, y=PADDING,
+                                      width=PADDING, height=PADDING // 2,
+                                      options=[str(x) for x in range(0, 59)])],
                GET_PATH: [PygButton(x=PADDING, y=height - PADDING - button_height,
                                     width=button_width, height=button_height,
                                     text=PATH_TEXT, visible=False)]
@@ -182,12 +209,20 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     images = load_images(filename)
     tile = load_zoom_image(images, zoom)
 
+    # PATH TESTER
+    path = Path()
+    path._routes = {62667: {}}
+    path.shapes = {62667:
+                       [(43.760348, -79.410691), (43.759892, -79.410757), (43.743248, -79.405991)]}
+
     # Start the event loop
     while True:
         # Display
         draw_map(screen, tile, x, y)
-        draw_buttons(screen, buttons, width, height)
         draw_waypoints(screen, images[zoom], waypoints, x, y)
+        if show_path:
+            draw_path(screen, images[zoom], path, x, y)
+        draw_buttons(screen, buttons, width, height)
         pygame.display.flip()
 
         # ---------------------------------------------------------------
@@ -206,12 +241,25 @@ def run_map(filename: str = "data/image_data/images_data.csv",
             # Get location data
             mouse_x, mouse_y = pygame.mouse.get_pos()
 
+            for i in range(0, len(buttons[SETTINGS])):
+                if buttons[SETTINGS][i].on_click(event):
+                    buttons[SETTINGS][i].on_select(event)
+                    if i == 0:
+                        waypoints['day'] = buttons[SETTINGS][i].selected
+                    else:
+                        time = []
+                        for j in range(1, len(buttons[SETTINGS])):
+                            time.append(int(buttons[SETTINGS][j].selected))
+                        waypoints['time'] = time_to_sec(time)
+                    clicked = True
+
             # Zoom in
             if buttons[ZOOM][0].on_click(event):
                 if clamp(zoom + 1) != zoom:
                     zoom = clamp(zoom + 1)
                     x, y = 0, 0
                     tile = load_zoom_image(images, zoom)
+                clicked = True
 
             # Zoom out
             elif buttons[ZOOM][1].on_click(event):
@@ -219,37 +267,47 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                     zoom = clamp(zoom - 1)
                     x, y = 0, 0
                     tile = load_zoom_image(images, zoom)
-
-            # dropdown for settings
-            elif buttons[SETTINGS][0].on_click(event):
-                buttons[SETTINGS][0].on_select(event)
-                waypoints['selected'] = buttons[SETTINGS][0].selected
+                clicked = True
 
             elif buttons[GET_PATH][0].on_click(event):
                 if buttons[GET_PATH][0].get_text() == PATH_TEXT:
                     print('points: ' + str(waypoints['pts'][0].get_lat_lon()) +
                           ', ' + str(waypoints['pts'][1].get_lat_lon()) +
-                          '; time: ' + waypoints['selected'])
+                          '; time: ' + str(waypoints['time']) + '; day: ' + waypoints['day'])
                     # give to algorithm
+                    show_path = True
                 else:
-                    waypoints = reset_points(buttons[GET_PATH][0], buttons[SETTINGS][0])
+                    reset = True
+                    show_path = False
+                clicked = True
 
-            # Clicked point or scroll
+            # Start scroll
             else:
+                x_diff, y_diff = scroll_diff(x, mouse_x), scroll_diff(y, mouse_y)
+                down = True
+
+        if event.type == pygame.MOUSEBUTTONUP:
+            down = False
+
+            # Clicked point
+            if not (scroll or clicked):
+                mouse_x, mouse_y = pygame.mouse.get_pos()
+
                 # get lat/lon
                 user_lat, user_lon = images[zoom].coord_to_lat_lon(mouse_x, mouse_y, x, y)
                 check_points_clicked(user_lat, user_lon, waypoints, buttons[GET_PATH][0])
+            else:
+                scroll = False
+                clicked = False
 
-                # get scroll info
-                x_diff, y_diff = scroll_diff(x, mouse_x), scroll_diff(y, mouse_y)
-                scroll = True
-
-        if event.type == pygame.MOUSEBUTTONUP:
-            scroll = False
+            if reset:
+                waypoints = reset_points(buttons[GET_PATH][0], buttons[SETTINGS][0])
+                reset = False
 
         if event.type == pygame.MOUSEMOTION:
             # scroll if mouse down
-            if scroll:
+            if down:
+                scroll = True
                 mouse_x, mouse_y = pygame.mouse.get_pos()
                 new_x, new_y = continue_scroll(images[zoom], width, height, x, y,
                                                mouse_x, mouse_y, x_diff, y_diff)

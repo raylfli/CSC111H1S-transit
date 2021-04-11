@@ -1,6 +1,5 @@
 """Pygame UI classes"""
 from typing import Union, Optional
-
 import pygame
 
 
@@ -8,7 +7,6 @@ class Rect:
     """It's a rectangle. Please refer to kindergarten for detailed explanation.
     (x, y) is the coordinate of the top left corner.
     """
-
     x: int
     y: int
     width: int
@@ -113,9 +111,11 @@ class PygButton(Button):
         return False
 
     def set_visible(self, value: bool) -> None:
+        """Set button as visible."""
         self._visible = value
 
     def get_text(self) -> str:
+        """Return button text."""
         return self._text
 
 
@@ -204,7 +204,10 @@ class PygDropdown(Button):
         """Return true if the event clicked this button."""
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = pygame.mouse.get_pos()
-            return self._rect.contains(x, y) or self._stack_rect.contains(x, y)
+            if self._active:
+                return self._rect.contains(x, y) or self._stack_rect.contains(x, y)
+            else:
+                return self._rect.contains(x, y)
         return False
 
     def on_select(self, event: pygame.event.Event):

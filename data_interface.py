@@ -290,12 +290,11 @@ class TransitQuery:
         return edges
 
     def get_edge_weights(self, stop_id_start: int, stop_id_end: int,
-                         time_sec: int) -> list[tuple[int, int, int, int, int, float]]:
+                         time_sec: int) -> list[tuple[int, int, int, float]]:
         """Return a list of the next vehicles to travel between the two stops after the
         given time (in seconds).
 
-        Returned tuples are in the form: ``(trip_id, stop_id_start, stop_id_end,
-        time_dep, time_arr, weight)`` where
+        Returned tuples are in the form: ``(trip_id, time_dep, time_arr, weight)`` where
             - ``time_dep >= time_sec``
 
         If there are no edges between the start and end stops, an empty list is returned.
@@ -311,25 +310,23 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        weights = []
         cur = self._con.execute("""
-        SELECT trip_id,
-            stop_id_start,
-            stop_id_end,
-            time_dep,
-            time_arr,
-            weight,
-            time_dep - :time AS time_diff
-        FROM weights
-        WHERE 
-            stop_id_start = :start AND
-            stop_id_end = :end AND 
-            time_diff >= 0;
+        SELECT trip_id, time_dep, time_arr, weight FROM 
+            (SELECT trip_id,
+                stop_id_start,
+                stop_id_end,
+                time_dep,
+                time_arr,
+                weight,
+                time_dep - :time AS time_diff
+            FROM weights
+            WHERE 
+                stop_id_start = :start AND
+                stop_id_end = :end AND 
+                time_diff >= 0);
         """, {'time': time_sec, 'start': stop_id_start, 'end': stop_id_end})
-        for row in cur:
-            weights.append((row[0], row[1], row[2], row[3], row[4], row[5]))
 
-        return weights
+        return cur.fetchall()
 
     def get_route_id(self, trip_id: int) -> int:
         """Return ``route_id`` from the given ``trip_id`.

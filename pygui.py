@@ -33,7 +33,7 @@ class Button:
         raise NotImplementedError
 
 
-class PygButton:
+class PygButton(Button):
     """A clickable button."""
 
     _rect: Rect
@@ -119,7 +119,7 @@ class PygButton:
         return self._text
 
 
-class PygDropdown:
+class PygDropdown(Button):
     """A dropdown menu."""
     selected: str
 

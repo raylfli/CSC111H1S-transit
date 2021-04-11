@@ -23,18 +23,8 @@ SETTINGS = 'settings'
 GET_PATH = 'path'
 PATH_TEXT = 'Get path'
 RESET_PATH_TEXT = 'Reset'
-DROPDOWN_TEXT = ['Morning', 'Afternoon', 'Evening']
-TEST_POINTS = [(43.74735, -79.1994),
-               (43.81984, -79.21122),
-               (43.768204, -79.412796),
-               (43.684044, -79.3207),
-               (43.828785, -79.275375),
-               (43.708115, -79.31103),
-               (43.680065, -79.34497),
-               (43.785343, -79.31073),
-               (43.698895, -79.4398),
-               (43.69683, -79.4914)
-               ]
+# TIME_TEXT = [str(x) for x in range(0, 24)]
+DAYS_TEXT = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
 
 def initialize_screen(allowed: list, width: int, height: int) -> pygame.Surface:
@@ -150,11 +140,11 @@ def check_points_clicked(lat: float, lon: float,
         button.set_text(text=RESET_PATH_TEXT)
 
 
-def reset_points(button: PygButton) -> dict:
+def reset_points(button: PygButton, dropdown: PygDropdown) -> dict:
     """..."""
     button.set_visible(False)
     button.set_text(text=PATH_TEXT)
-    return {'selected': DROPDOWN_TEXT[0], 'pts': []}
+    return {'selected': dropdown.selected, 'pts': []}
 
 
 def run_map(filename: str = "data/image_data/images_data.csv",
@@ -173,8 +163,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     scroll = False
     x_diff, y_diff = 0, 0
     zoom = 0
-    # points = {'start': (False, (0, 0)), 'stop': (False, (0, 0)), 'selected': DROPDOWN_TEXT[0]}
-    waypoints = {'selected': DROPDOWN_TEXT[0], 'pts': []}
+    waypoints = {'selected': DAYS_TEXT[0], 'pts': []}
     buttons = {ZOOM: [PygButton(x=width - PADDING - button_width,
                                 y=height - PADDING - 2 * button_height,
                                 width=button_width, height=button_height),
@@ -183,7 +172,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                                 width=button_width, height=button_height)],
                SETTINGS: [PygDropdown(x=PADDING, y=PADDING,
                                       width=PADDING * 2, height=PADDING // 2,
-                                      options=DROPDOWN_TEXT)],
+                                      options=DAYS_TEXT)],
                GET_PATH: [PygButton(x=PADDING, y=height - PADDING - button_height,
                                     width=button_width, height=button_height,
                                     text=PATH_TEXT, visible=False)]
@@ -243,7 +232,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                           '; time: ' + waypoints['selected'])
                     # give to algorithm
                 else:
-                    waypoints = reset_points(buttons[GET_PATH][0])
+                    waypoints = reset_points(buttons[GET_PATH][0], buttons[SETTINGS][0])
 
             # Clicked point or scroll
             else:

@@ -297,7 +297,7 @@ class TransitQuery:
 
         return stops
 
-    def get_edges(self) -> set[tuple[str, str]]:
+    def get_edges(self) -> set[tuple[int, int]]:
         """Return a set of tuples representing directed edges between stops.
 
         Returned tuples are in the form: ``(stop_id_start, stop_id_end)``.
@@ -307,11 +307,8 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        edges = set()
-        for row in self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM weights"""):
-            edges.add((row[0], row[1]))
-
-        return edges
+        cur = self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM weights""")
+        return set(cur.fetchall())
 
     def get_closest_stop(self, lat: float, lon: float) -> int:
         """Return the ``stop_id`` of the closest stop to the given latitude and longitude.

@@ -433,7 +433,7 @@ class TransitQuery:
     def get_shape_data(self, trip_id: int,
                        stop_id_start: int,
                        stop_id_end) -> dict[str, Union[int, list[tuple[float, float]]]]:
-        """Return the ``route_id`` and shape data between the two given stops.
+        """Return the ``route_id`` and shape data between the two adjacent stops.
 
         Shape data is used to plot points in between each of the stops.
 

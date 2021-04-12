@@ -43,11 +43,7 @@ def load_graph() -> Graph():
 
 
 if __name__ == '__main__':
-
-    g = load_graph()
-    # todo complete this section
-
-    print(find_route((43.776222, -79.347048), (43.787739, -79.334818), 62429, 7, g))
+    print(find_route((43.776222, -79.347048), (43.787739, -79.334818), 62429, 7, load_graph()))
 
     # import python_ta
     # # todo modify the PyTA check

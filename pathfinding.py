@@ -11,6 +11,9 @@ from util import distance
 def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], time: int, day: int,
                graph: Graph) -> list[tuple[int, int, int]]:
     """Given a start location, end location, and time block, compute the quickest transit route.
+    Returns a list of tuples (trip_id, start stop_id, end stop_id).
+    Note that the list is in reverse order of the actual route, i.e. element 0 of the returned list
+    is the most recent trip one must take
 
     Coordinates are given as (latitude, longitude), in degrees north and degrees east.
     Time is given in the number of seconds from the most recent midnight.

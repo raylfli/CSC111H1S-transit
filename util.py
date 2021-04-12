@@ -50,6 +50,43 @@ def seconds_to_time(secs: int) -> str:
     return f'{secs // 3600}:{((secs // 60) % 60):02}:{(secs % 60):02}'
 
 
+def stringify_day_num(day_num: int) -> str:
+    """Translate ``day_num`` into its corresponding day string in full lowercase.
+
+    Day counting starts from 1 on Monday:
+        - 1: Monday
+        - 2: Tuesday
+        - ...
+        - 6: Saturday
+        - 7: Sunday
+
+    Preconditions:
+        - 1 <= day_num <= 7
+
+    >>> stringify_day_num(1)
+    'monday'
+    >>> stringify_day_num(5)
+    'friday'
+    >>> stringify_day_num(7)
+    'sunday'
+    """
+    # TODO consider better way of doing this? creating/storing a dictionary might be wasteful
+    if day_num == 1:
+        return 'monday'
+    elif day_num == 2:
+        return 'tuesday'
+    elif day_num == 3:
+        return 'wednesday'
+    elif day_num == 4:
+        return 'thursday'
+    elif day_num == 5:
+        return 'friday'
+    elif day_num == 6:
+        return 'saturday'
+    else:  # day_num == 7
+        return 'sunday'
+
+
 if __name__ == '__main__':
     # TODO ADD PYTA CHECK
 

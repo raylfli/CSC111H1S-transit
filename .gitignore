@@ -13,6 +13,9 @@
 # Database
 *.db
 
+# Raw data files
+data/*.txt
+
 # Mac Files
 .DS_Store
 

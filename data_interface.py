@@ -10,6 +10,8 @@ import os
 import sqlite3
 import math
 
+import util
+
 from typing import Union
 
 
@@ -127,8 +129,8 @@ def init_db(data_dir: str, force: bool = False) -> None:
         _insert_file(data_dir_formatted + 'stops.txt', 'stops', con)
         _insert_file(data_dir_formatted + 'trips.txt', 'trips', con)
 
-        # compute weights
-        _generate_weights(con, force=force)
+        # compute edge distances
+        _compute_distances(con, force=force)
 
         con.commit()
         con.close()
@@ -173,12 +175,13 @@ def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
                       (int(dep_time_split[0]) * 3600 +
                        int(dep_time_split[1]) * 60 +
                        int(dep_time_split[2])),
-                      row[3], row[4], row[5], row[6], row[7], row[8])
+                      row[3], row[4], row[5], row[6], row[7],
+                      0 if row[8] == '' else row[8])
             con.execute("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
 
-def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
-    """Generate edge weights and store in a new table ``weights`` using information from
+def _compute_distances(con: sqlite3.Connection, force: bool = False) -> None:
+    """Compute edge shape distances and store in a new table ``edges`` using information from
     the ``stop_times`` table in the given Connection.
 
     DOES NOT commit changes.
@@ -187,35 +190,42 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
         - the ``stop_times`` table exists in the sqlite3 Connection
     """
     if con.execute("""
-    SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='weights'
+    SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='edges'
     """).fetchone()[0] == 0 or force:  # check if table does NOT exist (or force)
         if force:
-            con.execute("""DROP TABLE IF EXISTS weights;""")
+            con.execute("""DROP TABLE IF EXISTS edges;""")
 
         # create table
         con.executescript("""
-        CREATE TABLE weights
+        CREATE TABLE edges
             (trip_id INTEGER,
             stop_id_start INTEGER,
             stop_id_end INTEGER,
             time_dep INTEGER, -- time in seconds
             time_arr INTEGER, -- time in seconds
-            weight REAL,
-            shape_dist_traveled_start REAL DEFAULT 0 ,
-            shape_dist_traveled_end REAL DEFAULT 0);
+            dist REAL,
+            service_id INTEGER);
     
         -- Add index for indexing by start stop, end stop, and departure time
-        CREATE INDEX id_stops_time ON weights (stop_id_start, stop_id_end, time_dep);
-        CREATE INDEX id_trip_stops ON weights (trip_id, stop_id_start, stop_id_end);
+        CREATE INDEX id_stops_time ON edges (stop_id_start, stop_id_end, time_dep);
+        CREATE INDEX id_trip_stops ON edges (trip_id, stop_id_start, stop_id_end);
         """)
 
         # get number of rows in stop_times
         row_num = con.execute("""SELECT COUNT(trip_id) from stop_times""").fetchone()[0]
 
-        # compute weights and add
+        # compute edge distances and add
         cur = con.execute("""
-        SELECT trip_id, arrival_time, departure_time, stop_id, stop_sequence, shape_dist_traveled
-        FROM stop_times;
+        SELECT 
+            stop_times.trip_id, 
+            arrival_time, 
+            departure_time, 
+            stop_id, 
+            stop_sequence, 
+            shape_dist_traveled,
+            service_id
+        FROM stop_times
+        INNER JOIN trips ON trips.trip_id = stop_times.trip_id;
         """)
         next_row = cur.fetchone()
         for _ in range(row_num - 1):
@@ -227,12 +237,11 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
                 values = (curr_row[0],  # trip_id
                           curr_row[3], next_row[3],  # stop_ids
                           curr_row[2], next_row[1],  # dep/arr time
-                          next_row[1] - curr_row[2],  # weight
-                          curr_row[5],  # shape_dist_traveled
-                          next_row[5]  # shape_dist_traveled
+                          next_row[5] - curr_row[5],  # edge dist (based on shape_dist_traveled)
+                          curr_row[6]  # service_id
                           )
 
-                con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", values)
+                con.execute("""INSERT INTO edges VALUES (?, ?, ?, ?, ?, ?, ?)""", values)
 
 
 # ---------- DATABASE QUERY ---------- #
@@ -307,7 +316,7 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        cur = self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM weights""")
+        cur = self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM edges""")
         return set(cur.fetchall())
 
     def get_closest_stop(self, lat: float, lon: float) -> int:
@@ -451,7 +460,7 @@ class TransitQuery:
 
         shape_dist = self._con.execute("""
         SELECT shape_dist_traveled_start, shape_dist_traveled_end 
-        FROM weights
+        FROM edges
         WHERE 
             trip_id = :t_id AND 
             stop_id_start = :s_id_start AND

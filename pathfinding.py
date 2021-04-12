@@ -99,12 +99,12 @@ def construct_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)
     """Return a path constructed using path_bin. Note that the path returned is in reverse order:
     the first element is the final stop.
     """
-    path = [path_bin[goal_id]]
+    path = [path_bin[goal_id][:3]]
 
-    id = path_bin[goal_id][1]
-    while id in path_bin.keys():
-        path.append(path_bin[id][:3])
-        id = path_bin[id][1]
+    curr_id = path_bin[goal_id][1]
+    while curr_id in path_bin.keys():
+        path.append(path_bin[curr_id][:3])
+        curr_id = path_bin[curr_id][1]
 
     return path
 
@@ -115,19 +115,21 @@ def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int]], goal
     the first element is the final stop. The stops returned in each tuple are the start and end
     of each trip.
     """
+    # path_bin: (trip_id, start stop_id, end stop_id, time arrived)
     path = []
 
     curr_trip = path_bin[goal_id][0]
-    curr_id = goal_id
+    curr_id = path_bin[goal_id][1]
     start_stop = path_bin[goal_id][1]
     end_stop = path_bin[goal_id][2]
 
     while curr_id in path_bin.keys():
         if path_bin[curr_id][0] == curr_trip:
-            end_stop = path_bin[curr_id][2]
+            start_stop = path_bin[curr_id][1]
         else:
             path.append((curr_trip, start_stop, end_stop))
-            start_stop = end_stop
+            end_stop = start_stop
+            curr_trip = path_bin[curr_id][0]
         curr_id = path_bin[curr_id][1]
 
     path.append((curr_trip, start_stop, end_stop))

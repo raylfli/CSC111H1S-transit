@@ -17,7 +17,7 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 
 import data_interface
 from graph import Graph
-from pathfinding import a_star
+from pathfinding import find_route
 
 
 def load_graph() -> Graph():
@@ -47,8 +47,7 @@ if __name__ == '__main__':
     g = load_graph()
     # todo complete this section
 
-    q = data_interface.TransitQuery()
-    print(a_star(g.get_vertex(14155), g.get_vertex(2160), 62429, g, q))
+    print(find_route((43.776222, -79.347048), (43.787739, -79.334818), 62429, 7, g))
 
     # import python_ta
     # # todo modify the PyTA check

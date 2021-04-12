@@ -8,18 +8,23 @@ from data_interface import TransitQuery
 from util import distance
 
 
-def find_route(start_loc: float, end_loc: float, time: int, graph: Graph)\
-        -> list[tuple[int, int, int]]:
-    """Given a start location, end location, and time block, compute the quickest transit route."""
+def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], time: int, day: int,
+               graph: Graph) -> list[tuple[int, int, int]]:
+    """Given a start location, end location, and time block, compute the quickest transit route.
+
+    Coordinates are given as (latitude, longitude), in degrees north and degrees east.
+    Time is given in the number of seconds from the most recent midnight.
+    Day is given as integers [1, 7], where 1 is Monday and 7 is Sunday.
+    """
     query = TransitQuery()
 
-    start_id = start_loc  # TODO: find closest stop_id
-    end_id = end_loc  # TODO: find closest stop_id
+    start_id = query.get_closest_stop(start_loc[0], start_loc[1])
+    end_id = query.get_closest_stop(end_loc[0], end_loc[1])
 
-    return a_star(graph.get_vertex(start_id), graph.get_vertex(end_id), time, graph, query)
+    return a_star(graph.get_vertex(start_id), graph.get_vertex(end_id), time, day, query)
 
 
-def a_star(start: _Vertex, goal: _Vertex, time: int, graph: Graph, query: TransitQuery)\
+def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQuery)\
         -> list[tuple[int, int, int]]:
     """A* algorithm for graph pathfinding.
 
@@ -32,10 +37,9 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, graph: Graph, query: Transi
     open_set = PriorityQueue()
     open_set.put((h(start, goal), start))
 
-    test = []
-
     # For a stop_id n, path_bin[n] is the information for the trip/edge connecting it to the
-    # previous node. The information is given as a tuple: (trip_id, start stop_id, end stop_id)
+    # previous node. The information is given as a tuple:
+    # (trip_id, start stop_id, end stop_id, time arrived)
     path_bin = {}
 
     # score of cheapest path from start to curr currently known
@@ -46,27 +50,39 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, graph: Graph, query: Transi
         curr = open_set.get()[1]
 
         if curr == goal:
-            return construct_path(path_bin, curr.item)
-        for neighbour in curr.neighbours:
-            # (trip_id, time_dep, time_arr, weight)
-            t = time if curr.item not in path_bin else path_bin[curr.item][3]
-            temp_edge = graph.get_weight(curr.item, neighbour.item, t, query)
-            if len(temp_edge) > 0:
-                edge = temp_edge[0]
-                # optimize for both distance between stops and time taken to reach next stop
-                edge_weight = distance(curr.location, neighbour.location) * (edge[2] - t)
+            # Use construct_path for a path with all stops included
+            # Use construct_filtered_path for a path that only describe entire trip segments
+            return construct_path(path_bin, curr.stop_id)
+
+        for neighbour in curr.get_neighbours():
+            # Note that this only works if the heuristic is both consistent and admissible. Then
+            # the arrival time to the current stop will be on the optimal path, and therefore we
+            # want to query all stops connected to this stop after this time
+            t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
+            # If the time rolls over to the next day, query using the next day's timetable
+            d = (day + 1) % 7 if t - time < 0 else day
+            # Returned as (trip_id, time_dep, time_arr, dist)
+            try:
+                edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
+                # optimize for both distance travelled between stops and time taken to reach next stop
+                if (delta_t := edge[2] - t) >= 0:
+                    edge_weight = edge[3] * delta_t
+                else:
+                    edge_weight = edge[3] * (delta_t + 86400)
                 temp_gscore = g_score[curr] + edge_weight
 
                 if temp_gscore < g_score[neighbour]:
                     # record optimum path
-                    path_bin[neighbour.item] = (edge[0], curr.item, neighbour.item, edge[2])
+                    path_bin[neighbour.stop_id] = (edge[0], curr.stop_id, neighbour.stop_id, edge[2])
                     g_score[neighbour] = temp_gscore  # update g_score for neighbour
 
                     # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
                     # node removed from open_set is guaranteed to be optimal. Then by extension we know
-                    # we are not pushing any duplicate nodes.
+                    # we are not pushing any "bad" nodes.
                     f_score = g_score[neighbour] + h(curr, goal)
                     open_set.put((f_score, neighbour))
+            except Exception as e:
+                pass
 
 
 def h(curr: _Vertex, goal: _Vertex) -> float:
@@ -90,4 +106,29 @@ def construct_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)
         path.append(path_bin[id][:3])
         id = path_bin[id][1]
 
+    return path
+
+
+def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)\
+        -> list[tuple[int, int, int]]:
+    """Return a path constructed using path_bin. Note that the path returned is in reverse order:
+    the first element is the final stop. The stops returned in each tuple are the start and end
+    of each trip.
+    """
+    path = []
+
+    curr_trip = path_bin[goal_id][0]
+    curr_id = goal_id
+    start_stop = path_bin[goal_id][1]
+    end_stop = path_bin[goal_id][2]
+
+    while curr_id in path_bin.keys():
+        if path_bin[curr_id][0] == curr_trip:
+            end_stop = path_bin[curr_id][2]
+        else:
+            path.append((curr_trip, start_stop, end_stop))
+            start_stop = end_stop
+        curr_id = path_bin[curr_id][1]
+
+    path.append((curr_trip, start_stop, end_stop))
     return path

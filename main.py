@@ -38,6 +38,10 @@ def load_graph() -> Graph():
     for edge in q.get_edges():
         g.add_edge(edge[0], edge[1])
 
+    # just to check
+    print(g.get_closest_vertex(43.655880, -79.364380, q))
+    # should be the stop at queen st (5599)
+
     return g
 
 
@@ -49,10 +53,10 @@ if __name__ == '__main__':
     import python_ta
     # todo modify the PyTA check
 
-    python_ta.check_all(config={
-        'max-line-length': 1000,
-        'disable': ['E1136'],
-        'extra-imports': ['csv', 'networkx'],
-        'allowed-io': ['load_review_graph'],
-        'max-nested-blocks': 4
-    })
+    # python_ta.check_all(config={
+    #     'max-line-length': 1000,
+    #     'disable': ['E1136'],
+    #     'extra-imports': ['csv', 'networkx'],
+    #     'allowed-io': ['load_review_graph'],
+    #     'max-nested-blocks': 4
+    # })

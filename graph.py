@@ -25,7 +25,7 @@ class _Vertex:
         - all(self in u.neighbours for u in self.neighbours)
     """
     item: Any
-    location: tuple[int, int]
+    location: tuple[float, float]
     neighbours: set[_Vertex]
 
     def __init__(self, item: Any, location: tuple) -> None:
@@ -77,7 +77,7 @@ class Graph:
             raise ValueError
 
     def get_weight(self, item1: Any, item2: Any, time_sec: int, q: data_interface.TransitQuery()) \
-            -> list[tuple[int, int, float]]:
+            -> list[tuple[int, int, int, float]]:
         """Return the weight of the edge between the given items.
 
         Return 0 if item1 and item2 are not adjacent.
@@ -120,6 +120,10 @@ class Graph:
     def get_all_vertices(self) -> set:
         """Return a set of all vertex items in this graph."""
         return set(self._vertices.keys())
+
+    def get_closest_vertex(self, lat: float, lon: float, q: data_interface.TransitQuery()) -> int:
+        """Returns the closest stop_id to the given vertex in the graph."""
+        return q.get_closest_stop(lat, lon)
 
 
 if __name__ == '__main__':

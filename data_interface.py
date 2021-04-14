@@ -266,10 +266,10 @@ class TransitQuery:
     open: bool
     _con: sqlite3.Connection
 
-    def __init__(self) -> None:
-        """Initialize a new QueryDB object.
+    def __init__(self, db_file: str = 'transit.db') -> None:
+        """Initialize a new TransitQuery object.
         """
-        self._con = sqlite3.connect('transit.db')
+        self._con = sqlite3.connect(db_file)
         self.open = True
 
         # create distance function

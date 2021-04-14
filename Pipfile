@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 pygame = "2.0.1"
+requests = "*"
 
 [dev-packages]
 

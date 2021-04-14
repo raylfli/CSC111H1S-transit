@@ -348,7 +348,7 @@ class TransitQuery:
         return cur.fetchone()[0]
 
     def get_edge_data(self, stop_id_start: int, stop_id_end: int,
-                      time_sec: int, day: int) -> tuple[int, int, int, float]:
+                      time_sec: int, day: int) -> tuple[int, int, int, int, float]:
         """Return the edge information for the next vehicle that travels between the two stops
         after the given time (in seconds) on the specified day. Distance is the actual distance
         traveled by the vehicle--not the direct straight line distance between the two stops.
@@ -363,13 +363,17 @@ class TransitQuery:
             - 6: Saturday
             - 7: Sunday
 
-        Day counting also deals with ``time_sec >= 24 * 3600``. For example,
-        ``time_sec == 25 * 3600`` and ``day == 5`` (Friday 25:00) is considered to be equivalent
-        to ``time_sec == 3600`` and ``day == 6`` (Saturday 1:00).
+        Day counting also deals with ``time_sec >= 24 * 3600``. For example, the following are
+        considered to be equivalent:
+            - ``time_sec == 25 * 3600`` and ``day == 5`` (Friday 25:00)
+            - ``time_sec == 3600`` and ``day == 6`` (Saturday 1:00)
 
-        Returned tuples are in the form: ``(trip_id, time_dep, time_arr, dist)`` where
-            - ``0 <= time_dep <= 86400``
-            - ``0 <= time_arr <= 86400``
+        Returned tuples are in the form: ``(trip_id, day, time_dep, time_arr, dist)`` where
+            - ``1 <= day <= 7'
+        Day is used as a 'midnight reference'. For example, if
+            - ``day == 1 and time_dep == 28800``, the vehicle departs at 8:00 on Monday
+            - ``day == 1 and time_dep == 93600`` (notice that ``time_dep >= 86400``), the vehicle
+              departs at 2:00 on Tuesday
 
         For example, if you wanted to get the edge for the vehicles that travel between stop 100
         and stop 200 after 1:00 AM on Sunday,
@@ -386,42 +390,57 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
+        # check if edge exists
+        cur = self._con.execute("""
+        SELECT * 
+        FROM edges
+        WHERE 
+            stop_id_start = :start AND
+            stop_id_end = :end AND
+            time_dep >= 0
+        """, {'start': stop_id_start, 'end': stop_id_end})
+
+        if cur.fetchone() is None:
+            raise ValueError(f'Edge from {stop_id_start} to {stop_id_end} does not exist.')
+
         time_in_week = (day - 1) * 86400 + time_sec  # time in sec after Monday 00:00
 
         actual_time = time_in_week % 86400  # adjust for "time overscroll"
-        actual_day = time_in_week // 86400 + 1  # adjust for "day + time overscroll"
+        actual_day = time_in_week // 86400  # adjust for "day + time overscroll"
 
-        prev_day = util.stringify_day_num((actual_day + 5) % 7 + 1)
-        curr_day = util.stringify_day_num(actual_day)
+        res = None
+        while res is None:  # runs at least once
+            actual_day = actual_day % 7 + 1
+            prev_day = util.stringify_day_num((actual_day + 5) % 7 + 1)
+            curr_day = util.stringify_day_num(actual_day)
+            cur = self._con.execute(f"""
+            SELECT trip_id, time_dep, time_arr, dist FROM
+                (SELECT 
+                    trip_id,
+                    stop_id_start, 
+                    stop_id_end, 
+                    time_dep, 
+                    time_arr, 
+                    dist, 
+                    monday, tuesday, wednesday, thursday, friday, saturday, sunday, 
+                    MOD(time_dep, 86400) AS abs_time
+                FROM edges
+                INNER JOIN calendar ON edges.service_id = calendar.service_id
+                WHERE 
+                    stop_id_start = :start AND
+                    stop_id_end = :end AND 
+                    (({prev_day} = 1 AND time_dep >= 86400) OR
+                        ({curr_day} = 1 AND time_dep <= 86400)) AND
+                    abs_time >= :time
+                ORDER BY
+                    abs_time ASC);
+            """, {'time': actual_time, 'start': stop_id_start, 'end': stop_id_end})
+            actual_time = 0  # setup for next iteration
 
-        cur = self._con.execute(f"""
-        SELECT trip_id, time_dep, time_arr, dist FROM
-            (SELECT 
-                trip_id,
-                stop_id_start, 
-                stop_id_end, 
-                time_dep, 
-                time_arr, 
-                dist, 
-                monday, tuesday, wednesday, thursday, friday, saturday, sunday, 
-                MOD(time_dep, 86400) AS abs_time
-            FROM edges
-            INNER JOIN calendar ON edges.service_id = calendar.service_id
-            WHERE 
-                stop_id_start = :start AND
-                stop_id_end = :end AND 
-                (({prev_day} = 1 AND time_dep >= 86400) OR
-                    ({curr_day} = 1 AND time_dep <= 86400)) AND
-                abs_time >= :time
-            ORDER BY
-                abs_time ASC);
-        """, {'time': actual_time, 'start': stop_id_start, 'end': stop_id_end})
-
-        if (res := cur.fetchone()) is None:
-            raise ValueError(f'Edge from {stop_id_start} to {stop_id_end} after '
-                             f'{time_sec} on day {day} not found.')
+            res = cur.fetchone()
 
         return (res[0],  # trip_id
+                actual_day,  # day
                 res[1] % 86400,  # time_dep (adjusted for overscroll)
                 res[2] % 86400,  # time_arr (adjusted for overscroll)
                 res[3])  # dist

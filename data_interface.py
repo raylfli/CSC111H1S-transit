@@ -519,7 +519,10 @@ class TransitQuery:
 
         Raises ConnectionError if database is not connected.
 
-        Raises ValueError if no trip between the two stops exist.
+        Raises ValueError if:
+            - Invalid ``trip_id``
+            - Start and end stops do not exist in the given valid ``trip_id``
+            - Start stop is later in the shape than the end stop
         """
         if not self.open:
             raise ConnectionError('Database is not connected.')
@@ -530,6 +533,7 @@ class TransitQuery:
         WHERE trip_id = ?
         """, (trip_id,)).fetchone()
 
+        # check for invalid trip
         if trip_info is None:
             raise ValueError(f'Trip with id {trip_id} not found.')
 
@@ -547,6 +551,7 @@ class TransitQuery:
         WHERE trip_id = :t_id AND stop_id_end = :s_id_end
         """, {'t_id': trip_id, 's_id_end': stop_id_end}).fetchone()
 
+        # check for bad queries where stops are missing
         if shape_dist_start is None and shape_dist_start is None:
             raise ValueError(f'Start and end stops of {stop_id_start} and {stop_id_end} not found.')
         elif shape_dist_start is None:
@@ -557,6 +562,12 @@ class TransitQuery:
         shape_dist_start = shape_dist_start[0]
         shape_dist_end = shape_dist_end[0]
 
+        # check for reversed stops
+        if shape_dist_start >= shape_dist_end:
+            raise ValueError(f'Start and edge stops of {stop_id_start} and '
+                             f'{stop_id_end} may be reversed.')
+
+        # query for shape points in between stops
         shape_coords_cursor = self._con.execute("""
         SELECT shape_pt_lat, shape_pt_lon
         FROM shapes
@@ -565,6 +576,7 @@ class TransitQuery:
             shape_dist_traveled BETWEEN :s_dist_start AND :s_dist_end;
         """, {'s_id': shape_id, 's_dist_start': shape_dist_start, 's_dist_end': shape_dist_end})
 
+        # query start and end stop coordinates
         stop_start_coords = self._con.execute("""
         SELECT stop_lat, stop_lon
         FROM stops

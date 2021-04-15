@@ -324,15 +324,22 @@ class TransitQuery:
         cur = self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM edges""")
         return set(cur.fetchall())
 
-    def get_closest_stop(self, lat: float, lon: float, radius: float) -> list[int]:
+    def get_closest_stops(self, lat: float, lon: float, radius: float = -1) -> list[int]:
         """Return a list of ``stop_id``s corresponding to the closest stops to the given
-        latitude, longitude and a kilometer radius.
+        latitude and longitude.
+
+        Radius parameter allows for restricting the closest stops to a certain radius around the
+        given latitude and longitude. If not included, this function returns a list of length 1
+        with the single closest stop.
 
         Stops are returned in increasing distance away from the given lat/lon in kilometers.
 
         Returns an empty list if no stops are in the radius.
 
         Raises ConnectionError if database is not connected.
+
+        Preconditions:
+            - radius == -1 or radius >= 0
         """
         if not self.open:
             raise ConnectionError('Database is not connected.')
@@ -345,12 +352,15 @@ class TransitQuery:
                 stop_lon,
                 SPH_DIST(stop_lat, stop_lon, :ref_lat, :ref_lon) AS dist
             FROM stops
-            WHERE dist <= :radius
+            WHERE (dist <= :radius OR :radius = -1)
             ORDER BY 
                 dist ASC)
         """, {'ref_lat': lat, 'ref_lon': lon, 'radius': radius})
 
-        return [stop[0] for stop in cur]
+        if radius == -1:
+            return [cur.fetchone()[0]]
+        else:  # radius != -1
+            return [stop[0] for stop in cur]
 
     def get_edge_data(self, stop_id_start: int, stop_id_end: int,
                       time_sec: int, day: int) -> tuple[int, int, int, int, float]:

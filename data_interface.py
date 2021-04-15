@@ -203,7 +203,8 @@ def _compute_distances(con: sqlite3.Connection, force: bool = False) -> None:
             stop_id_end INTEGER,
             time_dep INTEGER, -- time in seconds
             time_arr INTEGER, -- time in seconds
-            dist REAL,
+            shape_dist_traveled_start REAL,
+            shape_dist_traveled_end REAL,
             service_id INTEGER);
     
         -- Add index for indexing by start stop, end stop, and departure time
@@ -237,11 +238,11 @@ def _compute_distances(con: sqlite3.Connection, force: bool = False) -> None:
                 values = (curr_row[0],  # trip_id
                           curr_row[3], next_row[3],  # stop_ids
                           curr_row[2], next_row[1],  # dep/arr time
-                          next_row[5] - curr_row[5],  # edge dist (based on shape_dist_traveled)
+                          curr_row[5], next_row[5],  # shape distances
                           curr_row[6]  # service_id
                           )
 
-                con.execute("""INSERT INTO edges VALUES (?, ?, ?, ?, ?, ?, ?)""", values)
+                con.execute("""INSERT INTO edges VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
 
 # ---------- DATABASE QUERY ---------- #
@@ -421,7 +422,7 @@ class TransitQuery:
                     stop_id_end, 
                     time_dep, 
                     time_arr, 
-                    dist, 
+                    shape_dist_traveled_end - shape_dist_traveled_start AS dist, 
                     monday, tuesday, wednesday, thursday, friday, saturday, sunday, 
                     MOD(time_dep, 86400) AS abs_time
                 FROM edges

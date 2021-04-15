@@ -16,38 +16,9 @@ import csv
 import logging
 import os
 import sqlite3
-from pathlib import Path
 from typing import Optional, Union
-from zipfile import ZipFile
-
-import requests
 
 import util
-
-
-# ---------- DATA DOWNLOAD ---------- #
-
-def download_data(data_dir: str = 'data/') -> None:
-    """Download and extract the TTC Routes and Schedules Data.
-
-    Link: https://open.toronto.ca/dataset/ttc-routes-and-schedules/
-    """
-    formatted_data_dir = data_dir if data_dir.endswith('/') else data_dir + '/'
-    Path(data_dir).mkdir(parents=True, exist_ok=True)  # create file path if not exists
-
-    url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
-          "-9362-42c1c8f03708"
-    zip_file_path = f'{formatted_data_dir}data.zip'
-
-    r = requests.get(url, stream=True)
-    with open(zip_file_path, mode='wb') as f:
-        for chunk in r.iter_content(chunk_size=128):
-            f.write(chunk)
-
-    with ZipFile(zip_file_path, mode='r') as zip_file:
-        zip_file.extractall(formatted_data_dir)
-
-    os.remove(zip_file_path)
 
 
 # ---------- DATABASE CREATION ---------- #
@@ -682,8 +653,6 @@ if __name__ == '__main__':
     # logging.basicConfig(level=logging.INFO)
 
     data_directory = 'data/'
-
-    download_data(data_directory)  # can be removed after files are present
 
     # init_db(data_directory, force=True)
     init_db(data_directory)

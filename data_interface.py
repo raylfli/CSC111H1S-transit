@@ -17,7 +17,7 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
-from typing import Union
+from typing import Optional, Union
 from zipfile import ZipFile
 
 import requests
@@ -37,17 +37,17 @@ def download_data(data_dir: str = 'data/') -> None:
 
     url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
           "-9362-42c1c8f03708"
-    zip_file = f'{formatted_data_dir}data.zip'
+    zip_file_path = f'{formatted_data_dir}data.zip'
 
     r = requests.get(url, stream=True)
-    with open(zip_file, mode='wb') as f:
+    with open(zip_file_path, mode='wb') as f:
         for chunk in r.iter_content(chunk_size=128):
             f.write(chunk)
 
-    with ZipFile(zip_file, mode='r') as zip:
-        zip.extractall(formatted_data_dir)
+    with ZipFile(zip_file_path, mode='r') as zip_file:
+        zip_file.extractall(formatted_data_dir)
 
-    os.remove(zip_file)
+    os.remove(zip_file_path)
 
 
 # ---------- DATABASE CREATION ---------- #
@@ -411,10 +411,12 @@ class TransitQuery:
             return [stop[0] for stop in cur]
 
     def get_edge_data(self, stop_id_start: int, stop_id_end: int,
-                      time_sec: int, day: int) -> tuple[int, int, int, int, float]:
+                      time_sec: int, day: int) -> Optional[tuple[int, int, int, int, float]]:
         """Return the edge information for the next vehicle that travels between the two stops
         after the given time (in seconds) on the specified day. Distance is the actual distance
         traveled by the vehicle--not the direct straight line distance between the two stops.
+
+        Returns None if no edge is found.
 
         Time is considered over a rolling window. For example, 25 * 3600 [25:00] is considered to
         be equivalent to 1 * 3600 [1:00].
@@ -474,8 +476,7 @@ class TransitQuery:
         actual_time = time_in_week % 86400  # adjust for "time overscroll"
         actual_day = time_in_week // 86400  # adjust for "day + time overscroll"
 
-        res = None
-        while res is None:  # runs at least once
+        for _ in range(7):  # runs at most 7 times (prevents infinite loops)
             actual_day = actual_day % 7 + 1
             prev_day = util.stringify_day_num((actual_day + 5) % 7 + 1)
             curr_day = util.stringify_day_num(actual_day)
@@ -505,11 +506,14 @@ class TransitQuery:
 
             res = cur.fetchone()
 
-        return (res[0],  # trip_id
-                actual_day,  # day
-                res[1] % 86400,  # time_dep (adjusted for overscroll)
-                res[2] % 86400,  # time_arr (adjusted for overscroll)
-                res[3])  # dist
+            if res is not None:
+                return (res[0],  # trip_id
+                        actual_day,  # day
+                        res[1] % 86400,  # time_dep (adjusted for overscroll)
+                        res[2] % 86400,  # time_arr (adjusted for overscroll)
+                        res[3])  # dist
+
+        return None
 
     def get_route_id(self, trip_id: int) -> int:
         """Return ``route_id`` from the given ``trip_id`.
@@ -571,7 +575,7 @@ class TransitQuery:
 
     def get_shape_data(self, trip_id: int,
                        stop_id_start: int,
-                       stop_id_end) -> dict[str, Union[int, list[tuple[float, float]]]]:
+                       stop_id_end: int) -> dict[str, Union[int, list[tuple[float, float]]]]:
         """Return the ``route_id`` and shape data between the two stops.
 
         Shape data is used to plot points in between each of the stops.

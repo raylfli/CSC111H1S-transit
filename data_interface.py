@@ -1,18 +1,51 @@
-"""Data Interface
+"""TTC Route Planner for Toronto, Ontario -- Data Interface
 
-TODO ADD DOCSTRING
+This module provides the functions and classes for interacting with the TTC GTFS static data.
+
+If the TTC GTFS static data files are not present in some data directory, ``download_data`` should
+be called to download and extract the data.
+
+Then, ``init_db`` should be called to initialize the ``transit.db`` SQLite database file and
+create the required tables. ``init_db`` also has a ``force`` parameter, allowing the database file
+to be forcefully remade by dropping pre-existing tables and recreating them.
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
 
 import csv
+import logging
 import os
 import sqlite3
-import math
+from typing import Union
+from zipfile import ZipFile
+
+import requests
 
 import util
 
-from typing import Union
+
+# ---------- DATA DOWNLOAD ---------- #
+
+def download_data(data_dir: str = 'data/') -> None:
+    """Download and extract the TTC Routes and Schedules Data.
+
+    Link: https://open.toronto.ca/dataset/ttc-routes-and-schedules/
+    """
+    formatted_data_dir = data_dir if data_dir.endswith('/') else data_dir + '/'
+
+    url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
+          "-9362-42c1c8f03708"
+    zip_file = f'{formatted_data_dir}data.zip'
+
+    r = requests.get(url, stream=True)
+    with open(zip_file, mode='wb') as f:
+        for chunk in r.iter_content(chunk_size=128):
+            f.write(chunk)
+
+    with ZipFile(zip_file, mode='r') as zip:
+        zip.extractall(formatted_data_dir)
+
+    os.remove(zip_file)
 
 
 # ---------- DATABASE CREATION ---------- #
@@ -22,7 +55,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
     from the given data_directory. If one already exists, this function does nothing, but
     if ``force is True``, this function will overwrite tables in the ``transit.db`` file.
 
-    Preconditions: TODO ADD MORE IF NEEDED
+    Preconditions:
         - os.isfile(data_dir + 'calendar.txt')
         - os.isfile(data_dir + 'routes.txt')
         - os.isfile(data_dir + 'shapes.txt')
@@ -32,9 +65,13 @@ def init_db(data_dir: str, force: bool = False) -> None:
         - files in the data_dir directory are formatted according to the GTFS static format.
     """
     if not os.path.isfile('transit.db') or force:
+        logger = logging.getLogger(__name__)
+        logger.info('Initializing database into "transit.db"')
+
         con = sqlite3.connect('transit.db')
 
         if force:  # remove existing files in database
+            logger.debug('Database force enabled -- dropping pre-existing tables')
             con.executescript("""
             DROP TABLE IF EXISTS calendar;
             DROP TABLE IF EXISTS routes;
@@ -47,6 +84,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
             """)
 
         # create tables corresponding to GTFS files
+        logger.debug('Creating database tables')
         con.executescript("""
         CREATE TABLE calendar
             (service_id INTEGER PRIMARY KEY ASC UNIQUE, 
@@ -122,6 +160,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
         data_dir_formatted = data_dir + ('/' if not data_dir.endswith('/') else '')
 
         # insert data
+        logger.debug('Inserting data into tables')
         _insert_file(data_dir_formatted + 'calendar.txt', 'calendar', con)
         _insert_file(data_dir_formatted + 'routes.txt', 'routes', con)
         _insert_file(data_dir_formatted + 'shapes.txt', 'shapes', con)
@@ -130,10 +169,13 @@ def init_db(data_dir: str, force: bool = False) -> None:
         _insert_file(data_dir_formatted + 'trips.txt', 'trips', con)
 
         # compute edge distances
+        logger.debug('Generating edges table')
         _compute_distances(con, force=force)
 
         con.commit()
         con.close()
+
+        logger.info('Database initialization completed')
 
 
 def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> None:
@@ -141,7 +183,7 @@ def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> No
 
     DOES NOT commit changes.
 
-    Preconditions:  # TODO EDIT IF NEW TABLES
+    Preconditions:
         - table_name in {'calendar', 'routes', 'shapes', 'stops', 'trips'}
         - table exists in the SQLite database connection
         - os.isfile(file_path)
@@ -251,7 +293,7 @@ class TransitQuery:
     """Used for persisting Transit database connections in order to speed up queries and database
     operations.
 
-    Connects to the SQLite database in the file ``transit.db``
+    Connects to the SQLite database in the file ``transit.db``.
 
     data_interface.init_db should be called before creating a TransitQuery object to correctly
     create the database.
@@ -273,6 +315,7 @@ class TransitQuery:
         self._con = sqlite3.connect(db_file)
         self.open = True
 
+        # create spherical distance function
         self._con.create_function('SPH_DIST', 4,
                                   lambda a, b, c, d: util.distance((a, b), (c, d)),
                                   deterministic=True)
@@ -281,6 +324,8 @@ class TransitQuery:
         self._con.create_function('MOD', 2,
                                   lambda a, b: a % b,
                                   deterministic=True)
+
+        logging.getLogger(__name__).debug('Initialized new TransitQuery object')
 
     def __del__(self) -> None:
         """Close database connections during object deletion.
@@ -292,6 +337,7 @@ class TransitQuery:
         """
         self._con.close()
         self.open = False
+        logging.getLogger(__name__).debug('Closed TransitQuery connection')
 
     def get_stops(self) -> set[tuple[int, tuple[float, float]]]:
         """Return a set of tuples representing all the stops in the database.
@@ -612,6 +658,11 @@ class TransitQuery:
 
 if __name__ == '__main__':
     # TODO ADD PYTA CHECK
+
+    # logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.INFO)
+
+    download_data()  # can be removed after files are present
 
     # init_db('data/', force=True)
     init_db('data/')

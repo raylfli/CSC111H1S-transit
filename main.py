@@ -14,32 +14,9 @@ Running the main block of this module will:
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
-import os
-import requests
-from zipfile import ZipFile
-
 import data_interface
 from graph import Graph
 from pathfinding import find_route
-
-
-def download_data() -> None:
-    """Download and extract TTC Routes and Schedules Data.
-    Link: https://open.toronto.ca/dataset/ttc-routes-and-schedules/
-    """
-    url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
-          "-9362-42c1c8f03708"
-    zip_file = 'data/data.zip'
-
-    r = requests.get(url, stream=True)
-    with open(zip_file, 'wb') as f:
-        for chunk in r.iter_content(chunk_size=128):
-            f.write(chunk)
-
-    with ZipFile(zip_file, 'r') as zip:
-        zip.extractall('data/')
-
-    os.remove(zip_file)
 
 
 def load_graph() -> Graph():

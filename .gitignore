@@ -13,5 +13,11 @@
 # Database
 *.db
 
+# Raw data files
+data/*.txt
+
 # Mac Files
 .DS_Store
+
+# Big boi file
+data/stop_times.txt

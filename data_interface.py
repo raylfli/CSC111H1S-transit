@@ -8,6 +8,9 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 import csv
 import os
 import sqlite3
+import math
+
+import util
 
 from typing import Union
 
@@ -20,6 +23,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
     if ``force is True``, this function will overwrite tables in the ``transit.db`` file.
 
     Preconditions: TODO ADD MORE IF NEEDED
+        - os.isfile(data_dir + 'calendar.txt')
         - os.isfile(data_dir + 'routes.txt')
         - os.isfile(data_dir + 'shapes.txt')
         - os.isfile(data_dir + 'stop_times.txt')
@@ -32,15 +36,31 @@ def init_db(data_dir: str, force: bool = False) -> None:
 
         if force:  # remove existing files in database
             con.executescript("""
+            DROP TABLE IF EXISTS calendar;
             DROP TABLE IF EXISTS routes;
             DROP TABLE IF EXISTS shapes;
             DROP TABLE IF EXISTS stop_times;
             DROP TABLE IF EXISTS stops;
             DROP TABLE IF EXISTS trips;
+            
+            VACUUM;
             """)
 
         # create tables corresponding to GTFS files
         con.executescript("""
+        CREATE TABLE calendar
+            (service_id INTEGER PRIMARY KEY ASC UNIQUE, 
+            monday INTEGER, 
+            tuesday INTEGER, 
+            wednesday INTEGER, 
+            thursday INTEGER, 
+            friday INTEGER, 
+            saturday INTEGER, 
+            sunday INTEGER, 
+            start_date TEXT, 
+            end_date TEXT)
+        WITHOUT ROWID;
+        
         CREATE TABLE routes 
             (route_id INTEGER PRIMARY KEY ASC UNIQUE, 
             agency_id INTEGER, 
@@ -102,14 +122,15 @@ def init_db(data_dir: str, force: bool = False) -> None:
         data_dir_formatted = data_dir + ('/' if not data_dir.endswith('/') else '')
 
         # insert data
+        _insert_file(data_dir_formatted + 'calendar.txt', 'calendar', con)
         _insert_file(data_dir_formatted + 'routes.txt', 'routes', con)
         _insert_file(data_dir_formatted + 'shapes.txt', 'shapes', con)
         _insert_stop_times_file(data_dir_formatted + 'stop_times.txt', con)
         _insert_file(data_dir_formatted + 'stops.txt', 'stops', con)
         _insert_file(data_dir_formatted + 'trips.txt', 'trips', con)
 
-        # compute weights
-        _generate_weights(con, force=force)
+        # compute edge distances
+        _compute_distances(con, force=force)
 
         con.commit()
         con.close()
@@ -121,7 +142,7 @@ def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> No
     DOES NOT commit changes.
 
     Preconditions:  # TODO EDIT IF NEW TABLES
-        - table_name in {'routes', 'stops', 'trips'}
+        - table_name in {'calendar', 'routes', 'shapes', 'stops', 'trips'}
         - table exists in the SQLite database connection
         - os.isfile(file_path)
         - specified file includes a header row
@@ -154,12 +175,13 @@ def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
                       (int(dep_time_split[0]) * 3600 +
                        int(dep_time_split[1]) * 60 +
                        int(dep_time_split[2])),
-                      row[3], row[4], row[5], row[6], row[7], row[8])
+                      row[3], row[4], row[5], row[6], row[7],
+                      0 if row[8] == '' else row[8])
             con.execute("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
 
-def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
-    """Generate edge weights and store in a new table ``weights`` using information from
+def _compute_distances(con: sqlite3.Connection, force: bool = False) -> None:
+    """Compute edge shape distances and store in a new table ``edges`` using information from
     the ``stop_times`` table in the given Connection.
 
     DOES NOT commit changes.
@@ -168,35 +190,43 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
         - the ``stop_times`` table exists in the sqlite3 Connection
     """
     if con.execute("""
-    SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='weights'
+    SELECT COUNT(name) FROM sqlite_master WHERE type='table' AND name='edges'
     """).fetchone()[0] == 0 or force:  # check if table does NOT exist (or force)
         if force:
-            con.execute("""DROP TABLE IF EXISTS weights;""")
+            con.execute("""DROP TABLE IF EXISTS edges;""")
 
         # create table
         con.executescript("""
-        CREATE TABLE weights
+        CREATE TABLE edges
             (trip_id INTEGER,
             stop_id_start INTEGER,
             stop_id_end INTEGER,
             time_dep INTEGER, -- time in seconds
             time_arr INTEGER, -- time in seconds
-            weight REAL,
-            shape_dist_traveled_start REAL DEFAULT 0 ,
-            shape_dist_traveled_end REAL DEFAULT 0);
+            shape_dist_traveled_start REAL,
+            shape_dist_traveled_end REAL,
+            service_id INTEGER);
     
         -- Add index for indexing by start stop, end stop, and departure time
-        CREATE INDEX id_stops_time ON weights (stop_id_start, stop_id_end, time_dep);
-        CREATE INDEX id_trip_stops ON weights (trip_id, stop_id_start, stop_id_end);
+        CREATE INDEX id_stops_time ON edges (stop_id_start, stop_id_end, time_dep);
+        CREATE INDEX id_trip_stops ON edges (trip_id, stop_id_start, stop_id_end);
         """)
 
         # get number of rows in stop_times
         row_num = con.execute("""SELECT COUNT(trip_id) from stop_times""").fetchone()[0]
 
-        # compute weights and add
+        # compute edge distances and add
         cur = con.execute("""
-        SELECT trip_id, arrival_time, departure_time, stop_id, stop_sequence, shape_dist_traveled
-        FROM stop_times;
+        SELECT 
+            stop_times.trip_id, 
+            arrival_time, 
+            departure_time, 
+            stop_id, 
+            stop_sequence, 
+            shape_dist_traveled,
+            service_id
+        FROM stop_times
+        INNER JOIN trips ON trips.trip_id = stop_times.trip_id;
         """)
         next_row = cur.fetchone()
         for _ in range(row_num - 1):
@@ -208,12 +238,11 @@ def _generate_weights(con: sqlite3.Connection, force: bool = False) -> None:
                 values = (curr_row[0],  # trip_id
                           curr_row[3], next_row[3],  # stop_ids
                           curr_row[2], next_row[1],  # dep/arr time
-                          next_row[1] - curr_row[2],  # weight
-                          curr_row[5],  # shape_dist_traveled
-                          next_row[5]  # shape_dist_traveled
+                          curr_row[5], next_row[5],  # shape distances
+                          curr_row[6]  # service_id
                           )
 
-                con.execute("""INSERT INTO weights VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", values)
+                con.execute("""INSERT INTO edges VALUES (?, ?, ?, ?, ?, ?, ?, ?)""", values)
 
 
 # ---------- DATABASE QUERY ---------- #
@@ -238,11 +267,21 @@ class TransitQuery:
     open: bool
     _con: sqlite3.Connection
 
-    def __init__(self) -> None:
-        """Initialize a new QueryDB object.
+    def __init__(self, db_file: str = 'transit.db') -> None:
+        """Initialize a new TransitQuery object.
         """
-        self._con = sqlite3.connect('transit.db')
+        self._con = sqlite3.connect(db_file)
         self.open = True
+
+        # create distance function
+        self._con.create_function('DIST', 2,
+                                  lambda a, b: math.sqrt(a ** 2 + b ** 2),
+                                  deterministic=True)
+
+        # create modulus function
+        self._con.create_function('MOD', 2,
+                                  lambda a, b: a % b,
+                                  deterministic=True)
 
     def __del__(self) -> None:
         """Close database connections during object deletion.
@@ -273,7 +312,7 @@ class TransitQuery:
 
         return stops
 
-    def get_edges(self) -> set[tuple[str, str]]:
+    def get_edges(self) -> set[tuple[int, int]]:
         """Return a set of tuples representing directed edges between stops.
 
         Returned tuples are in the form: ``(stop_id_start, stop_id_end)``.
@@ -283,53 +322,129 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        edges = set()
-        for row in self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM weights"""):
-            edges.add((row[0], row[1]))
+        cur = self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM edges""")
+        return set(cur.fetchall())
 
-        return edges
+    def get_closest_stop(self, lat: float, lon: float) -> int:
+        """Return the ``stop_id`` of the closest stop to the given latitude and longitude.
 
-    def get_edge_weights(self, stop_id_start: int, stop_id_end: int,
-                         time_sec: int) -> list[tuple[int, int, int, int, int, float]]:
-        """Return a list of the next vehicles to travel between the two stops after the
-        given time (in seconds).
+        This function disregards a curved Earth, and simply subtracts the latitude and longitude
+        to compute the closest stop.
 
-        Returned tuples are in the form: ``(trip_id, stop_id_start, stop_id_end,
-        time_dep, time_arr, weight)`` where
-            - ``time_dep >= time_sec``
+        Raises ConnectionError if database is not connected.
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
 
-        If there are no edges between the start and end stops, an empty list is returned.
+        cur = self._con.execute("""
+        SELECT 
+            stop_id, 
+            stop_lat - ? AS diff_lat, 
+            stop_lon - ? AS diff_lon
+        FROM stops
+        ORDER BY 
+            DIST(diff_lat, diff_lon) ASC
+        """, (lat, lon))
 
-        For example, if you wanted to get the weights for the vehicles to travel between stop 100
-        and stop 200 after 1:00 AM, you would call: ``TransitDB.get_edge_weights(100, 200, 3600)``
+        return cur.fetchone()[0]
+
+    def get_edge_data(self, stop_id_start: int, stop_id_end: int,
+                      time_sec: int, day: int) -> tuple[int, int, int, int, float]:
+        """Return the edge information for the next vehicle that travels between the two stops
+        after the given time (in seconds) on the specified day. Distance is the actual distance
+        traveled by the vehicle--not the direct straight line distance between the two stops.
+
+        Time is considered over a rolling window. For example, 25 * 3600 [25:00] is considered to
+        be equivalent to 1 * 3600 [1:00].
+
+        Day counting starts from 1 on Monday:
+            - 1: Monday
+            - 2: Tuesday
+            - ...
+            - 6: Saturday
+            - 7: Sunday
+
+        Day counting also deals with ``time_sec >= 24 * 3600``. For example, the following are
+        considered to be equivalent:
+            - ``time_sec == 25 * 3600`` and ``day == 5`` (Friday 25:00)
+            - ``time_sec == 3600`` and ``day == 6`` (Saturday 1:00)
+
+        Returned tuples are in the form: ``(trip_id, day, time_dep, time_arr, dist)`` where
+            - ``1 <= day <= 7'
+        Day is used as a 'midnight reference'. For example, if
+            - ``day == 1 and time_dep == 28800``, the vehicle departs at 8:00 on Monday
+            - ``day == 1 and time_dep == 93600`` (notice that ``time_dep >= 86400``), the vehicle
+              departs at 2:00 on Tuesday
+
+        For example, if you wanted to get the edge for the vehicles that travel between stop 100
+        and stop 200 after 1:00 AM on Sunday,
+        you would call: ``TransitQuery.get_edge_data(100, 200, 3600, 7)``
+
+        Raises ValueError if no edge found.
 
         Raises ConnectionError if database is not connected.
 
         Preconditions:
             - time_sec >= 0
+            - 1 <= day <= 7
         """
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        weights = []
+        # check if edge exists
         cur = self._con.execute("""
-        SELECT trip_id,
-            stop_id_start,
-            stop_id_end,
-            time_dep,
-            time_arr,
-            weight,
-            time_dep - :time AS time_diff
-        FROM weights
+        SELECT * 
+        FROM edges
         WHERE 
             stop_id_start = :start AND
-            stop_id_end = :end AND 
-            time_diff >= 0;
-        """, {'time': time_sec, 'start': stop_id_start, 'end': stop_id_end})
-        for row in cur:
-            weights.append((row[0], row[1], row[2], row[3], row[4], row[5]))
+            stop_id_end = :end AND
+            time_dep >= 0
+        """, {'start': stop_id_start, 'end': stop_id_end})
 
-        return weights
+        if cur.fetchone() is None:
+            raise ValueError(f'Edge from {stop_id_start} to {stop_id_end} does not exist.')
+
+        time_in_week = (day - 1) * 86400 + time_sec  # time in sec after Monday 00:00
+
+        actual_time = time_in_week % 86400  # adjust for "time overscroll"
+        actual_day = time_in_week // 86400  # adjust for "day + time overscroll"
+
+        res = None
+        while res is None:  # runs at least once
+            actual_day = actual_day % 7 + 1
+            prev_day = util.stringify_day_num((actual_day + 5) % 7 + 1)
+            curr_day = util.stringify_day_num(actual_day)
+            cur = self._con.execute(f"""
+            SELECT trip_id, time_dep, time_arr, dist FROM
+                (SELECT 
+                    trip_id,
+                    stop_id_start, 
+                    stop_id_end, 
+                    time_dep, 
+                    time_arr, 
+                    shape_dist_traveled_end - shape_dist_traveled_start AS dist, 
+                    monday, tuesday, wednesday, thursday, friday, saturday, sunday, 
+                    MOD(time_dep, 86400) AS abs_time
+                FROM edges
+                INNER JOIN calendar ON edges.service_id = calendar.service_id
+                WHERE 
+                    stop_id_start = :start AND
+                    stop_id_end = :end AND 
+                    (({prev_day} = 1 AND time_dep >= 86400) OR
+                        ({curr_day} = 1 AND time_dep <= 86400)) AND
+                    abs_time >= :time
+                ORDER BY
+                    abs_time ASC);
+            """, {'time': actual_time, 'start': stop_id_start, 'end': stop_id_end})
+            actual_time = 0  # setup for next iteration
+
+            res = cur.fetchone()
+
+        return (res[0],  # trip_id
+                actual_day,  # day
+                res[1] % 86400,  # time_dep (adjusted for overscroll)
+                res[2] % 86400,  # time_arr (adjusted for overscroll)
+                res[3])  # dist
 
     def get_route_id(self, trip_id: int) -> int:
         """Return ``route_id`` from the given ``trip_id`.
@@ -392,14 +507,15 @@ class TransitQuery:
     def get_shape_data(self, trip_id: int,
                        stop_id_start: int,
                        stop_id_end) -> dict[str, Union[int, list[tuple[float, float]]]]:
-        """Return the ``route_id`` and shape data between the two given stops.
+        """Return the ``route_id`` and shape data between the two stops.
 
         Shape data is used to plot points in between each of the stops.
 
         Returned dictionary contains the following keys:
             - route_id: ``route_id`` of the traveled path between two stops (int)
             - shape: list of ``tuple[float, float]`` containing the shape/path as
-            (latitude, longitude) between the given stops
+            (latitude, longitude) between the given stops. The element at the 0th index is
+            always the start stop, and the element at the -1th index is always the end stop.
 
         Raises ConnectionError if database is not connected.
 
@@ -408,24 +524,38 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        shape_dist = self._con.execute("""
-        SELECT shape_dist_traveled_start, shape_dist_traveled_end 
-        FROM weights
-        WHERE 
-            trip_id = :t_id AND 
-            stop_id_start = :s_id_start AND
-            stop_id_end = :s_id_end;
-        """, {'t_id': trip_id, 's_id_start': stop_id_start, 's_id_end': stop_id_end}).fetchone()
-
-        if shape_dist is None:
-            raise ValueError(f'Trip with id {trip_id} and '
-                             f'stop id {stop_id_start} to id {stop_id_end} not found.')
-
-        route_id, shape_id = self._con.execute("""
+        trip_info = self._con.execute("""
         SELECT route_id, shape_id
         FROM trips
         WHERE trip_id = ?
         """, (trip_id,)).fetchone()
+
+        if trip_info is None:
+            raise ValueError(f'Trip with id {trip_id} not found.')
+
+        route_id, shape_id = trip_info
+
+        shape_dist_start = self._con.execute("""
+        SELECT shape_dist_traveled_start 
+        FROM edges
+        WHERE trip_id = :t_id AND stop_id_start = :s_id_start
+        """, {'t_id': trip_id, 's_id_start': stop_id_start}).fetchone()
+
+        shape_dist_end = self._con.execute("""
+        SELECT shape_dist_traveled_end
+        FROM edges
+        WHERE trip_id = :t_id AND stop_id_end = :s_id_end
+        """, {'t_id': trip_id, 's_id_end': stop_id_end}).fetchone()
+
+        if shape_dist_start is None and shape_dist_start is None:
+            raise ValueError(f'Start and end stops of {stop_id_start} and {stop_id_end} not found.')
+        elif shape_dist_start is None:
+            raise ValueError(f'No start stop with id {stop_id_start} found in trip {trip_id}.')
+        elif shape_dist_end is None:
+            raise ValueError(f'No end stop with id {stop_id_end} found in trip {trip_id}.')
+
+        shape_dist_start = shape_dist_start[0]
+        shape_dist_end = shape_dist_end[0]
 
         shape_coords_cursor = self._con.execute("""
         SELECT shape_pt_lat, shape_pt_lon
@@ -433,7 +563,7 @@ class TransitQuery:
         WHERE 
             shape_id = :s_id AND
             shape_dist_traveled BETWEEN :s_dist_start AND :s_dist_end;
-        """, {'s_id': shape_id, 's_dist_start': shape_dist[0], 's_dist_end': shape_dist[1]})
+        """, {'s_id': shape_id, 's_dist_start': shape_dist_start, 's_dist_end': shape_dist_end})
 
         stop_start_coords = self._con.execute("""
         SELECT stop_lat, stop_lon
@@ -448,7 +578,7 @@ class TransitQuery:
         """, (stop_id_end,)).fetchone()
 
         return {'route_id': route_id,
-                'shape': [stop_start_coords] + shape_coords_cursor.fetchmany() + [stop_end_coords]}
+                'shape': [stop_start_coords] + shape_coords_cursor.fetchall() + [stop_end_coords]}
 
 
 if __name__ == '__main__':

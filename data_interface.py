@@ -213,12 +213,12 @@ def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
             arr_time_split = row[1].split(':')
             dep_time_split = row[2].split(':')
             values = (row[0],
-                      (int(arr_time_split[0]) * 3600 +
-                       int(arr_time_split[1]) * 60 +
-                       int(arr_time_split[2])),
-                      (int(dep_time_split[0]) * 3600 +
-                       int(dep_time_split[1]) * 60 +
-                       int(dep_time_split[2])),
+                      (int(arr_time_split[0]) * 3600
+                       + int(arr_time_split[1]) * 60
+                       + int(arr_time_split[2])),
+                      (int(dep_time_split[0]) * 3600
+                       + int(dep_time_split[1]) * 60
+                       + int(dep_time_split[2])),
                       row[3], row[4], row[5], row[6], row[7],
                       0 if row[8] == '' else row[8])
             con.execute("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", values)
@@ -663,7 +663,20 @@ class TransitQuery:
 
 
 if __name__ == '__main__':
-    # TODO ADD PYTA CHECK
+    import python_ta.contracts
+    python_ta.contracts.check_all_contracts()
+
+    import doctest
+    doctest.testmod()
+
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['csv', 'logging', 'os', 'sqlite3', 'pathlib', 'typing', 'zipfile',
+                          'requests', 'util'],
+        'allowed-io': ['download_data', 'init_db', '_insert_file', '_insert_stop_times_file'],
+        'max-line-length': 100,
+        'disable': ['E1136']
+    })
 
     # logging.basicConfig(level=logging.DEBUG)
     # logging.basicConfig(level=logging.INFO)

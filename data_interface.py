@@ -16,6 +16,7 @@ import csv
 import logging
 import os
 import sqlite3
+from pathlib import Path
 from typing import Union
 from zipfile import ZipFile
 
@@ -32,6 +33,7 @@ def download_data(data_dir: str = 'data/') -> None:
     Link: https://open.toronto.ca/dataset/ttc-routes-and-schedules/
     """
     formatted_data_dir = data_dir if data_dir.endswith('/') else data_dir + '/'
+    Path(data_dir).mkdir(parents=True, exist_ok=True)  # create file path if not exists
 
     url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
           "-9362-42c1c8f03708"
@@ -662,9 +664,11 @@ if __name__ == '__main__':
     # logging.basicConfig(level=logging.DEBUG)
     # logging.basicConfig(level=logging.INFO)
 
-    download_data()  # can be removed after files are present
+    data_directory = 'data/'
 
-    # init_db('data/', force=True)
-    init_db('data/')
+    download_data(data_directory)  # can be removed after files are present
+
+    # init_db(data_directory, force=True)
+    init_db(data_directory)
 
     q = TransitQuery()

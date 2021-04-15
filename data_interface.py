@@ -371,10 +371,13 @@ class TransitQuery:
 
         Returned tuples are in the form: ``(trip_id, day, time_dep, time_arr, dist)`` where
             - ``1 <= day <= 7'
-        Day is used as a 'midnight reference'. For example, if
+            - ``0 <= time_dep < 86400``
+            - ``0 <= time_arr < 86400``
+        Day is used as a 'midnight reference' for ``time_dep``. For example, if
             - ``day == 1 and time_dep == 28800``, the vehicle departs at 8:00 on Monday
-            - ``day == 1 and time_dep == 93600`` (notice that ``time_dep >= 86400``), the vehicle
-              departs at 2:00 on Tuesday
+        Note that it is possible for ``time_dep >= time_arr``. This can occur when ``time_dep`` is
+        close to midnight of the previous day, and the vehicle arrives at the next stop midnight
+        the next day.
 
         For example, if you wanted to get the edge for the vehicles that travel between stop 100
         and stop 200 after 1:00 AM on Sunday,

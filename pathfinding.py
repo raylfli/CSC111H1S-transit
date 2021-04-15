@@ -64,28 +64,26 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
             t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
             # If the time rolls over to the next day, query using the next day's timetable
             d = (day + 1) % 7 if t - time < 0 else day
-            # Returned as (trip_id, time_dep, time_arr, dist)
-            try:
-                edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
-                # optimize for both distance travelled between stops and time taken to reach next stop
-                if (delta_t := edge[2] - t) >= 0:
-                    edge_weight = edge[3] * delta_t
-                else:
-                    edge_weight = edge[3] * (delta_t + 86400)
-                temp_gscore = g_score[curr] + edge_weight
+            # Returned as (trip_id, day, time_dep, time_arr, dist)
+            edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
+            # optimize for both distance travelled between stops and time taken to reach next stop
+            # if (delta_t := edge[2]86400 - t) >= 0:
+            #     edge_weight = edge[3] * delta_t
+            # else:
+            #     edge_weight = edge[3] * (delta_t + 86400)
+            edge_weight = edge[4] * (86400 - t + (edge[1] - d - 1) * 86400 + edge[3])
+            temp_gscore = g_score[curr] + edge_weight
 
-                if temp_gscore < g_score[neighbour]:
-                    # record optimum path
-                    path_bin[neighbour.stop_id] = (edge[0], curr.stop_id, neighbour.stop_id, edge[2])
-                    g_score[neighbour] = temp_gscore  # update g_score for neighbour
+            if temp_gscore < g_score[neighbour]:
+                # record optimum path
+                path_bin[neighbour.stop_id] = (edge[0], curr.stop_id, neighbour.stop_id, edge[3])
+                g_score[neighbour] = temp_gscore  # update g_score for neighbour
 
-                    # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
-                    # node removed from open_set is guaranteed to be optimal. Then by extension we know
-                    # we are not pushing any "bad" nodes.
-                    f_score = g_score[neighbour] + h(curr, goal)
-                    open_set.put((f_score, neighbour))
-            except Exception as e:
-                pass
+                # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
+                # node removed from open_set is guaranteed to be optimal. Then by extension we know
+                # we are not pushing any "bad" nodes.
+                f_score = g_score[neighbour] + h(curr, goal)
+                open_set.put((f_score, neighbour))
 
 
 def h(curr: _Vertex, goal: _Vertex) -> float:

@@ -5,6 +5,16 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 import math
 
 
+# day number mapped to day of the week
+DAY_NUM_TO_DAY = {1: 'monday',
+                  2: 'tuesday',
+                  3: 'wednesday',
+                  4: 'thursday',
+                  5: 'friday',
+                  6: 'saturday',
+                  7: 'sunday'}
+
+
 def distance(location1: tuple[float, float], location2: tuple[float, float]) -> float:
     """Great-circle distance between two points location1 and location2, calculated using
      the haversine formula.
@@ -70,21 +80,7 @@ def stringify_day_num(day_num: int) -> str:
     >>> stringify_day_num(7)
     'sunday'
     """
-    # TODO consider better way of doing this? creating/storing a dictionary might be wasteful
-    if day_num == 1:
-        return 'monday'
-    elif day_num == 2:
-        return 'tuesday'
-    elif day_num == 3:
-        return 'wednesday'
-    elif day_num == 4:
-        return 'thursday'
-    elif day_num == 5:
-        return 'friday'
-    elif day_num == 6:
-        return 'saturday'
-    else:  # day_num == 7
-        return 'sunday'
+    return DAY_NUM_TO_DAY[day_num]
 
 
 if __name__ == '__main__':

@@ -1,18 +1,51 @@
-"""Data Interface
+"""TTC Route Planner for Toronto, Ontario -- Data Interface
 
-TODO ADD DOCSTRING
+This module provides the functions and classes for interacting with the TTC GTFS static data.
+
+If the TTC GTFS static data files are not present in some data directory, ``download_data`` should
+be called to download and extract the data.
+
+Then, ``init_db`` should be called to initialize the ``transit.db`` SQLite database file and
+create the required tables. ``init_db`` also has a ``force`` parameter, allowing the database file
+to be forcefully remade by dropping pre-existing tables and recreating them.
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
 
 import csv
+import logging
 import os
 import sqlite3
-import math
+from typing import Union
+from zipfile import ZipFile
+
+import requests
 
 import util
 
-from typing import Union
+
+# ---------- DATA DOWNLOAD ---------- #
+
+def download_data(data_dir: str = 'data/') -> None:
+    """Download and extract the TTC Routes and Schedules Data.
+
+    Link: https://open.toronto.ca/dataset/ttc-routes-and-schedules/
+    """
+    formatted_data_dir = data_dir if data_dir.endswith('/') else data_dir + '/'
+
+    url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
+          "-9362-42c1c8f03708"
+    zip_file = f'{formatted_data_dir}data.zip'
+
+    r = requests.get(url, stream=True)
+    with open(zip_file, mode='wb') as f:
+        for chunk in r.iter_content(chunk_size=128):
+            f.write(chunk)
+
+    with ZipFile(zip_file, mode='r') as zip:
+        zip.extractall(formatted_data_dir)
+
+    os.remove(zip_file)
 
 
 # ---------- DATABASE CREATION ---------- #
@@ -22,7 +55,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
     from the given data_directory. If one already exists, this function does nothing, but
     if ``force is True``, this function will overwrite tables in the ``transit.db`` file.
 
-    Preconditions: TODO ADD MORE IF NEEDED
+    Preconditions:
         - os.isfile(data_dir + 'calendar.txt')
         - os.isfile(data_dir + 'routes.txt')
         - os.isfile(data_dir + 'shapes.txt')
@@ -32,9 +65,13 @@ def init_db(data_dir: str, force: bool = False) -> None:
         - files in the data_dir directory are formatted according to the GTFS static format.
     """
     if not os.path.isfile('transit.db') or force:
+        logger = logging.getLogger(__name__)
+        logger.info('Initializing database into "transit.db"')
+
         con = sqlite3.connect('transit.db')
 
         if force:  # remove existing files in database
+            logger.debug('Database force enabled -- dropping pre-existing tables')
             con.executescript("""
             DROP TABLE IF EXISTS calendar;
             DROP TABLE IF EXISTS routes;
@@ -47,6 +84,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
             """)
 
         # create tables corresponding to GTFS files
+        logger.debug('Creating database tables')
         con.executescript("""
         CREATE TABLE calendar
             (service_id INTEGER PRIMARY KEY ASC UNIQUE, 
@@ -122,6 +160,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
         data_dir_formatted = data_dir + ('/' if not data_dir.endswith('/') else '')
 
         # insert data
+        logger.debug('Inserting data into tables')
         _insert_file(data_dir_formatted + 'calendar.txt', 'calendar', con)
         _insert_file(data_dir_formatted + 'routes.txt', 'routes', con)
         _insert_file(data_dir_formatted + 'shapes.txt', 'shapes', con)
@@ -130,10 +169,13 @@ def init_db(data_dir: str, force: bool = False) -> None:
         _insert_file(data_dir_formatted + 'trips.txt', 'trips', con)
 
         # compute edge distances
+        logger.debug('Generating edges table')
         _compute_distances(con, force=force)
 
         con.commit()
         con.close()
+
+        logger.info('Database initialization completed')
 
 
 def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> None:
@@ -141,7 +183,7 @@ def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> No
 
     DOES NOT commit changes.
 
-    Preconditions:  # TODO EDIT IF NEW TABLES
+    Preconditions:
         - table_name in {'calendar', 'routes', 'shapes', 'stops', 'trips'}
         - table exists in the SQLite database connection
         - os.isfile(file_path)
@@ -251,7 +293,7 @@ class TransitQuery:
     """Used for persisting Transit database connections in order to speed up queries and database
     operations.
 
-    Connects to the SQLite database in the file ``transit.db``
+    Connects to the SQLite database in the file ``transit.db``.
 
     data_interface.init_db should be called before creating a TransitQuery object to correctly
     create the database.
@@ -273,15 +315,17 @@ class TransitQuery:
         self._con = sqlite3.connect(db_file)
         self.open = True
 
-        # create distance function
-        self._con.create_function('DIST', 2,
-                                  lambda a, b: math.sqrt(a ** 2 + b ** 2),
+        # create spherical distance function
+        self._con.create_function('SPH_DIST', 4,
+                                  lambda a, b, c, d: util.distance((a, b), (c, d)),
                                   deterministic=True)
 
         # create modulus function
         self._con.create_function('MOD', 2,
                                   lambda a, b: a % b,
                                   deterministic=True)
+
+        logging.getLogger(__name__).debug('Initialized new TransitQuery object')
 
     def __del__(self) -> None:
         """Close database connections during object deletion.
@@ -293,6 +337,7 @@ class TransitQuery:
         """
         self._con.close()
         self.open = False
+        logging.getLogger(__name__).debug('Closed TransitQuery connection')
 
     def get_stops(self) -> set[tuple[int, tuple[float, float]]]:
         """Return a set of tuples representing all the stops in the database.
@@ -325,28 +370,43 @@ class TransitQuery:
         cur = self._con.execute("""SELECT DISTINCT stop_id_start, stop_id_end FROM edges""")
         return set(cur.fetchall())
 
-    def get_closest_stop(self, lat: float, lon: float) -> int:
-        """Return the ``stop_id`` of the closest stop to the given latitude and longitude.
+    def get_closest_stops(self, lat: float, lon: float, radius: float = -1) -> list[int]:
+        """Return a list of ``stop_id``s corresponding to the closest stops to the given
+        latitude and longitude.
 
-        This function disregards a curved Earth, and simply subtracts the latitude and longitude
-        to compute the closest stop.
+        Radius parameter allows for restricting the closest stops to a certain radius around the
+        given latitude and longitude. If not included, this function returns a list of length 1
+        with the single closest stop.
+
+        Stops are returned in increasing distance away from the given lat/lon in kilometers.
+
+        Returns an empty list if no stops are in the radius.
 
         Raises ConnectionError if database is not connected.
+
+        Preconditions:
+            - radius == -1 or radius >= 0
         """
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
         cur = self._con.execute("""
-        SELECT 
-            stop_id, 
-            stop_lat - ? AS diff_lat, 
-            stop_lon - ? AS diff_lon
-        FROM stops
-        ORDER BY 
-            DIST(diff_lat, diff_lon) ASC
-        """, (lat, lon))
+        SELECT stop_id FROM 
+            (SELECT 
+                stop_id, 
+                stop_lat, 
+                stop_lon,
+                SPH_DIST(stop_lat, stop_lon, :ref_lat, :ref_lon) AS dist
+            FROM stops
+            WHERE (dist <= :radius OR :radius = -1)
+            ORDER BY 
+                dist ASC)
+        """, {'ref_lat': lat, 'ref_lon': lon, 'radius': radius})
 
-        return cur.fetchone()[0]
+        if radius == -1:
+            return [cur.fetchone()[0]]
+        else:  # radius != -1
+            return [stop[0] for stop in cur]
 
     def get_edge_data(self, stop_id_start: int, stop_id_end: int,
                       time_sec: int, day: int) -> tuple[int, int, int, int, float]:
@@ -371,10 +431,13 @@ class TransitQuery:
 
         Returned tuples are in the form: ``(trip_id, day, time_dep, time_arr, dist)`` where
             - ``1 <= day <= 7'
-        Day is used as a 'midnight reference'. For example, if
+            - ``0 <= time_dep < 86400``
+            - ``0 <= time_arr < 86400``
+        Day is used as a 'midnight reference' for ``time_dep``. For example, if
             - ``day == 1 and time_dep == 28800``, the vehicle departs at 8:00 on Monday
-            - ``day == 1 and time_dep == 93600`` (notice that ``time_dep >= 86400``), the vehicle
-              departs at 2:00 on Tuesday
+        Note that it is possible for ``time_dep >= time_arr``. This can occur when ``time_dep`` is
+        close to midnight of the previous day, and the vehicle arrives at the next stop midnight
+        the next day.
 
         For example, if you wanted to get the edge for the vehicles that travel between stop 100
         and stop 200 after 1:00 AM on Sunday,
@@ -519,7 +582,10 @@ class TransitQuery:
 
         Raises ConnectionError if database is not connected.
 
-        Raises ValueError if no trip between the two stops exist.
+        Raises ValueError if:
+            - Invalid ``trip_id``
+            - Start and end stops do not exist in the given valid ``trip_id``
+            - Start stop is later in the shape than the end stop
         """
         if not self.open:
             raise ConnectionError('Database is not connected.')
@@ -530,6 +596,7 @@ class TransitQuery:
         WHERE trip_id = ?
         """, (trip_id,)).fetchone()
 
+        # check for invalid trip
         if trip_info is None:
             raise ValueError(f'Trip with id {trip_id} not found.')
 
@@ -547,6 +614,7 @@ class TransitQuery:
         WHERE trip_id = :t_id AND stop_id_end = :s_id_end
         """, {'t_id': trip_id, 's_id_end': stop_id_end}).fetchone()
 
+        # check for bad queries where stops are missing
         if shape_dist_start is None and shape_dist_start is None:
             raise ValueError(f'Start and end stops of {stop_id_start} and {stop_id_end} not found.')
         elif shape_dist_start is None:
@@ -557,6 +625,12 @@ class TransitQuery:
         shape_dist_start = shape_dist_start[0]
         shape_dist_end = shape_dist_end[0]
 
+        # check for reversed stops
+        if shape_dist_start >= shape_dist_end:
+            raise ValueError(f'Start and edge stops of {stop_id_start} and '
+                             f'{stop_id_end} may be reversed.')
+
+        # query for shape points in between stops
         shape_coords_cursor = self._con.execute("""
         SELECT shape_pt_lat, shape_pt_lon
         FROM shapes
@@ -565,6 +639,7 @@ class TransitQuery:
             shape_dist_traveled BETWEEN :s_dist_start AND :s_dist_end;
         """, {'s_id': shape_id, 's_dist_start': shape_dist_start, 's_dist_end': shape_dist_end})
 
+        # query start and end stop coordinates
         stop_start_coords = self._con.execute("""
         SELECT stop_lat, stop_lon
         FROM stops
@@ -583,6 +658,11 @@ class TransitQuery:
 
 if __name__ == '__main__':
     # TODO ADD PYTA CHECK
+
+    # logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.INFO)
+
+    download_data()  # can be removed after files are present
 
     # init_db('data/', force=True)
     init_db('data/')

@@ -507,14 +507,15 @@ class TransitQuery:
     def get_shape_data(self, trip_id: int,
                        stop_id_start: int,
                        stop_id_end) -> dict[str, Union[int, list[tuple[float, float]]]]:
-        """Return the ``route_id`` and shape data between the two adjacent stops.
+        """Return the ``route_id`` and shape data between the two stops.
 
         Shape data is used to plot points in between each of the stops.
 
         Returned dictionary contains the following keys:
             - route_id: ``route_id`` of the traveled path between two stops (int)
             - shape: list of ``tuple[float, float]`` containing the shape/path as
-            (latitude, longitude) between the given stops
+            (latitude, longitude) between the given stops. The element at the 0th index is
+            always the start stop, and the element at the -1th index is always the end stop.
 
         Raises ConnectionError if database is not connected.
 
@@ -523,24 +524,38 @@ class TransitQuery:
         if not self.open:
             raise ConnectionError('Database is not connected.')
 
-        shape_dist = self._con.execute("""
-        SELECT shape_dist_traveled_start, shape_dist_traveled_end 
-        FROM edges
-        WHERE 
-            trip_id = :t_id AND 
-            stop_id_start = :s_id_start AND
-            stop_id_end = :s_id_end;
-        """, {'t_id': trip_id, 's_id_start': stop_id_start, 's_id_end': stop_id_end}).fetchone()
-
-        if shape_dist is None:
-            raise ValueError(f'Trip with id {trip_id} and '
-                             f'stop id {stop_id_start} to id {stop_id_end} not found.')
-
-        route_id, shape_id = self._con.execute("""
+        trip_info = self._con.execute("""
         SELECT route_id, shape_id
         FROM trips
         WHERE trip_id = ?
         """, (trip_id,)).fetchone()
+
+        if trip_info is None:
+            raise ValueError(f'Trip with id {trip_id} not found.')
+
+        route_id, shape_id = trip_info
+
+        shape_dist_start = self._con.execute("""
+        SELECT shape_dist_traveled_start 
+        FROM edges
+        WHERE trip_id = :t_id AND stop_id_start = :s_id_start
+        """, {'t_id': trip_id, 's_id_start': stop_id_start}).fetchone()
+
+        shape_dist_end = self._con.execute("""
+        SELECT shape_dist_traveled_end
+        FROM edges
+        WHERE trip_id = :t_id AND stop_id_end = :s_id_end
+        """, {'t_id': trip_id, 's_id_end': stop_id_end}).fetchone()
+
+        if shape_dist_start is None and shape_dist_start is None:
+            raise ValueError(f'Start and end stops of {stop_id_start} and {stop_id_end} not found.')
+        elif shape_dist_start is None:
+            raise ValueError(f'No start stop with id {stop_id_start} found in trip {trip_id}.')
+        elif shape_dist_end is None:
+            raise ValueError(f'No end stop with id {stop_id_end} found in trip {trip_id}.')
+
+        shape_dist_start = shape_dist_start[0]
+        shape_dist_end = shape_dist_end[0]
 
         shape_coords_cursor = self._con.execute("""
         SELECT shape_pt_lat, shape_pt_lon
@@ -548,7 +563,7 @@ class TransitQuery:
         WHERE 
             shape_id = :s_id AND
             shape_dist_traveled BETWEEN :s_dist_start AND :s_dist_end;
-        """, {'s_id': shape_id, 's_dist_start': shape_dist[0], 's_dist_end': shape_dist[1]})
+        """, {'s_id': shape_id, 's_dist_start': shape_dist_start, 's_dist_end': shape_dist_end})
 
         stop_start_coords = self._con.execute("""
         SELECT stop_lat, stop_lon
@@ -563,7 +578,7 @@ class TransitQuery:
         """, (stop_id_end,)).fetchone()
 
         return {'route_id': route_id,
-                'shape': [stop_start_coords] + shape_coords_cursor.fetchmany() + [stop_end_coords]}
+                'shape': [stop_start_coords] + shape_coords_cursor.fetchall() + [stop_end_coords]}
 
 
 if __name__ == '__main__':

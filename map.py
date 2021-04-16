@@ -218,24 +218,26 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
     settings_l = [PygLabel(20, 50, 50, 20, "Day:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 100, 70, 20, "Hours:", font, background_color=(255, 255, 255)),
-                  PygLabel(20, 125, 70, 20, "Minute:", font, background_color=(255, 255, 255)),
+                  PygLabel(20, 125, 40, 20, "Minute:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 150, 70, 20, "Second:", font, background_color=(255, 255, 255)),
-                  PygLabel(100, 100, 20, 20, str(time_nums[0]), font, background_color=(255, 255, 255)),
-                  PygLabel(100, 125, 20, 20, str(time_nums[1]), font, background_color=(255, 255, 255)),
-                  PygLabel(100, 150, 20, 20, str(time_nums[2]), font, background_color=(255, 255, 255))]
+                  PygLabel(100, 100, 30, 20, str(time_nums[0]), font, background_color=(255, 255, 255), txt_align=2),
+                  PygLabel(100, 125, 30, 20, str(time_nums[1]), font, background_color=(255, 255, 255),
+                           txt_align=2),
+                  PygLabel(100, 150, 30, 20, str(time_nums[2]), font, background_color=(255, 255, 255),
+                           txt_align=2)]
 
     settings_b = [PygButton(25, 500, 150, 20, "Get Route", font, txt_align=1),
                   PygButton(25, 540, 150, 20, "Reset", font, txt_align=1),
-                  PygButton(125, 100, 9, 9, draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)), # hour inc
-                  PygButton(125, 111, 9, 9,
+                  PygButton(135, 100, 9, 9, draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)), # hour inc
+                  PygButton(135, 111, 9, 9,
                             draw_func=lambda a, b, c, d, e: draw_dec(a, b, c, d, e)),  # hour dec
-                  PygButton(125, 125, 9, 9,
+                  PygButton(135, 125, 9, 9,
                             draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)),  # hour inc
-                  PygButton(125, 136, 9, 9,
+                  PygButton(135, 136, 9, 9,
                             draw_func=lambda a, b, c, d, e: draw_dec(a, b, c, d, e)),  # hour inc
-                  PygButton(125, 150, 9, 9,
+                  PygButton(135, 150, 9, 9,
                             draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)),  # hour inc
-                  PygButton(125, 161, 9, 9,
+                  PygButton(135, 161, 9, 9,
                             draw_func=lambda a, b, c, d, e: draw_dec(a, b, c, d, e))]  # hour inc
 
     settings_dd = [PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)]
@@ -341,24 +343,25 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
             path.set_visible(True)
         elif settings_b[1].on_click(event):
             waypoints = []
+            path.set_visible(False)
             # print(f'Waypoints num: {len(waypoints["pts"])}')
         elif settings_b[2].on_click(event):  # hour inc
-            time_nums[0] = clamp(time_nums[0] + 1, 0, 23)
+            time_nums[0] = (time_nums[0] + 1) % 24
             settings_l[4].set_text(str(time_nums[0]))  # refresh time label
         elif settings_b[3].on_click(event):  # hour dec
-            time_nums[0] = clamp(time_nums[0] - 1, 0, 23)
+            time_nums[0] = (time_nums[0] - 1) % 24
             settings_l[4].set_text(str(time_nums[0]))  # refresh time label
         elif settings_b[4].on_click(event):  # minute inc
-            time_nums[1] = clamp(time_nums[1] + 1, 0, 59)
+            time_nums[1] = (time_nums[1] + 1) % 60
             settings_l[5].set_text(str(time_nums[1]))  # refresh time label
         elif settings_b[5].on_click(event):  # minute dec
-            time_nums[1] = clamp(time_nums[1] - 1, 0, 59)
+            time_nums[1] = (time_nums[1] - 1) % 60
             settings_l[5].set_text(str(time_nums[1]))  # refresh time label
         elif settings_b[6].on_click(event):  # second inc
-            time_nums[2] = clamp(time_nums[2] + 1, 0, 59)
+            time_nums[2] = (time_nums[2] + 1) % 60
             settings_l[6].set_text(str(time_nums[2]))  # refresh time label
         elif settings_b[7].on_click(event):  # second dec
-            time_nums[2] = clamp(time_nums[2] - 1, 0, 59)
+            time_nums[2] = (time_nums[2] - 1) % 60
             settings_l[6].set_text(str(time_nums[2]))  # refresh time label
 
         for dropdown in settings_dd:
@@ -368,7 +371,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
         # Scroll and point logic
         if event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_x, mouse_y = pygame.mouse.get_pos()
+            # mouse_x, mouse_y = pygame.mouse.get_pos()
 
             if map_bound.contains(mouse_x, mouse_y) and not clicked:
                 # print('In Map')
@@ -392,6 +395,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         if event.type == pygame.MOUSEMOTION:
             # scroll if mouse down
             if down:
+                mouse_x -= map_bound.x
+                mouse_y -= map_bound.y
                 scroll = True
                 new_x, new_y = continue_scroll(images[zoom], map_bound.width, map_bound.height, x, y,
                                                mouse_x, mouse_y, x_diff, y_diff)

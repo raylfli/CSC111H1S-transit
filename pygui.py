@@ -31,7 +31,7 @@ class Button:
         raise NotImplementedError
 
 
-class PygButton(Button):
+class PygButton:
     """A clickable button."""
 
     _rect: Rect
@@ -83,8 +83,8 @@ class PygButton(Button):
             self._image = None
 
     def _set_text(self, text: str = None,
-                 font: tuple[str, int] = (pygame.font.get_default_font(), 20),
-                 txt_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
+                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                  txt_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
         """..."""
         if text is not None:
             self._text = text
@@ -118,6 +118,12 @@ class PygButton(Button):
                                                          self._rect.y + (self._rect.height - height) / 2)),
                                  pygame.Rect(max(0, (width - self._rect.width) / 2), max(0, (height - self._rect.height) / 2),
                                              self._rect.width, self._rect.height))
+                elif self._txt_align == 2:
+                    surface.blit(self._txt_surface, (max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
+                                                     max(self._rect.y,
+                                                         self._rect.y + self._rect.height - height)),
+                                 pygame.Rect(max(0, width - self._rect.width), max(0, height - self._rect.height),
+                                             self._rect.width, self._rect.height))
 
             if self._image is not None:
                 if self._image_mode == 1:
@@ -143,7 +149,7 @@ class PygButton(Button):
         return self._text
 
 
-class PygDropdown(Button):
+class PygDropdown:
     """A dropdown menu."""
     selected: str
 
@@ -308,10 +314,18 @@ class PygLabel:
                          pygame.Rect(max(0, (width - self._rect.width) / 2),
                                      max(0, (height - self._rect.height) / 2),
                                      self._rect.width, self._rect.height))
+        elif self._txt_align == 2:
+            surface.blit(self._text_surface, (
+                max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
+                max(self._rect.y,
+                    self._rect.y + self._rect.height - height)),
+                         pygame.Rect(max(0, width - self._rect.width),
+                                     max(0, height - self._rect.height),
+                                     self._rect.width, self._rect.height))
 
     def _set_text(self, text: str = None,
-                 font: tuple[str, int] = (pygame.font.get_default_font(), 20),
-                 text_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
+                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                  text_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
         """Set this label's text."""
         self.text = text
         self._text_col = text_col

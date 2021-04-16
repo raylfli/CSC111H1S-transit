@@ -15,7 +15,7 @@ class Path:
         """Initialize a Path object."""
         self._routes = {}
         self.shapes = []
-        self._visible = False
+        self._visible = visible
 
     def draw(self, screen: pygame.Surface, image: Image,
              orig_x: int, orig_y: int, line_width: int = 2) -> None:

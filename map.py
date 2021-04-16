@@ -170,7 +170,7 @@ def reset_points(button: PygButton, day_dropdown: PygDropdown, hr_dropdown: PygD
 def run_map(filename: str = "data/image_data/images_data.csv",
             width: int = 800, height: int = 600,
             button_width: int = 50, button_height: int = 50) -> None:
-    """...
+    """Run main map.
 
     Preconditions:
         - 150 <= width <= 1000
@@ -206,18 +206,19 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                GET_PATH: [PygButton(x=PADDING, y=height - PADDING - button_height,
                                     width=button_width, height=button_height,
                                     text=PATH_TEXT, visible=False)]
+               # 'label': [PygLabel(x=PADDING * 4, y=PADDING,
+               #                    width=PADDING, height=PADDING // 2,
+               #                    text='00')]
                }
 
     # load image
     images = load_images(filename)
     tile = load_zoom_image(images, zoom)
 
-    # PATH TESTER
+    # create path
     path = Path()
-    # path._routes = {62667: {}}
-    # path.shapes = [(43.760348, -79.410691), (43.759892, -79.410757), (43.743248, -79.405991)]
 
-    label = PygLabel(200, 200, 100, 50, 'Lorem Ipsum', background_color=(255, 255, 255))
+    # label = PygLabel(200, 200, 100, 50, 'Lorem Ipsum', background_color=(255, 255, 255))
 
     # Start the event loop
     while True:
@@ -277,9 +278,9 @@ def run_map(filename: str = "data/image_data/images_data.csv",
 
             elif buttons[GET_PATH][0].on_click(event):
                 if buttons[GET_PATH][0].get_text() == PATH_TEXT:
-                    print('points: ' + str(waypoints['pts'][0].get_lat_lon()) +
-                          ', ' + str(waypoints['pts'][1].get_lat_lon()) +
-                          '; time: ' + str(waypoints['time']) + '; day: ' + str(waypoints['day']))
+                    # print('points: ' + str(waypoints['pts'][0].get_lat_lon()) +
+                    #       ', ' + str(waypoints['pts'][1].get_lat_lon()) +
+                    #       '; time: ' + str(waypoints['time']) + '; day: ' + str(waypoints['day']))
                     path.get_shapes(waypoints['pts'][0].get_lat_lon(),
                                     waypoints['pts'][1].get_lat_lon(),
                                     pathfinding.find_route(waypoints['pts'][0].get_lat_lon(),

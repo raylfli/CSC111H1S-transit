@@ -228,7 +228,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         draw_path(screen, images[zoom], path, x, y)
         draw_buttons(screen, buttons, width, height)
 
-        label.draw(screen)
+        # label.draw(screen)
 
         pygame.display.flip()
 

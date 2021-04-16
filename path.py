@@ -8,24 +8,32 @@ from typing import Union
 class Path:
     """The path to be drawn."""
     _routes: dict[int, dict[str, Union[dict, str]]]
+    _visible: bool
     shapes: list[tuple[float, float]]
 
-    def __init__(self) -> None:
+    def __init__(self, visible: bool = False) -> None:
         """Initialize a Path object."""
         self._routes = {}
         self.shapes = []
+        self._visible = False
 
     def draw(self, screen: pygame.Surface, image: Image,
              orig_x: int, orig_y: int, line_width: int = 2) -> None:
         """Draw the path"""
-        for point in self.shapes:
-            start_lat, start_lon = point[0]
-            end_lat, end_lon = point[1]
-            start = image.lat_lon_to_coord(start_lat, start_lon, orig_x, orig_y)
-            end = image.lat_lon_to_coord(end_lat, end_lon, orig_x, orig_y)
-            pygame.draw.line(screen, pygame.Color('black'), start, end, line_width)
+        if self._visible:
+            for i in range(0, len(self.shapes) - 1):
+                start_lat, start_lon = self.shapes[i]
+                end_lat, end_lon = self.shapes[i + 1]
+                start = image.lat_lon_to_coord(start_lat, start_lon, orig_x, orig_y)
+                end = image.lat_lon_to_coord(end_lat, end_lon, orig_x, orig_y)
+                pygame.draw.line(screen, pygame.Color('black'), start, end, line_width)
 
-    def get_shapes(self, stops: list[tuple[int, int, int]]) -> None:
+    def set_visible(self, value: bool) -> None:
+        """..."""
+        self._visible = value
+
+    def get_shapes(self, start: tuple[float, float], end: tuple[float, float],
+                   stops: list[tuple[int, int, int]]) -> None:
         """Get shapes for a path.
 
         points is a list of tuples of (trip_id, stop_id_start, stop_id_end)
@@ -33,17 +41,21 @@ class Path:
         init_db('data')
         query = TransitQuery()
         shapes = []
+        self.shapes = [start]
 
         for i in range(len(stops) - 1, -1, -1):
             trip_id, stop_id_start, stop_id_end = stops[i]
-            shapes.append(query.get_shape_data(trip_id, stop_id_start, stop_id_end))
+            if trip_id != 0:
+                shapes.append(query.get_shape_data(trip_id, stop_id_start, stop_id_end))
 
         for shape in shapes:
             if shape['route_id'] not in self._routes:
                 self._routes[shape['route_id']] = query.get_route_info(shape['route_id'])
             for lat_lon in shape['shape']:
                 self.shapes.append(lat_lon)
+        self.shapes.append(end)
         print(self.shapes)
+        query.close()
 
 
 if __name__ == '__main__':

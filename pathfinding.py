@@ -211,6 +211,7 @@ def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]],
         else:
             path.append((curr_trip, start_stop, end_stop))
             end_stop = start_stop
+            start_stop = path_bin[curr_id][1]
             curr_trip = path_bin[curr_id][0]
         curr_id = path_bin[curr_id][1]
 

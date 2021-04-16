@@ -479,9 +479,9 @@ class PygPageLabel:
 
         if label.cont:
             self.buttons = (PygButton(x - button_width, y + height // 2,
-                                      button_width, button_width, font=font, text='<'),
+                                      button_width, button_width, font=font, draw_func=draw_page_left),
                             PygButton(x + width, y + height // 2,
-                                      button_width, button_width, font=font, text='>'))
+                                      button_width, button_width, font=font, draw_func=draw_page_right))
         else:
             self.buttons = None
 
@@ -516,3 +516,16 @@ class PygPageLabel:
     def set_visible(self, value: bool) -> None:
         """Set visibility."""
         self._visible = value
+
+
+def draw_page_left(screen: pygame.Surface, x: int, y: int, width:int, height: int) -> None:
+    """Draw page left button."""
+    pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y), 2)
+    pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y + height), 2)
+
+
+def draw_page_right(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
+    """Draw page right button."""
+    pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y), (x + width, y + height / 2), 2)
+    pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y + height),
+                     (x + width, y + height / 2), 2)

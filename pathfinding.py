@@ -86,7 +86,7 @@ def a_star(id1: int, id2: int, time: int, day: int) \
             # print(f'Day arrival: {path_bin[curr.stop_id][4]}   Day departure: {day}')
             delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + \
                       path_bin[curr.stop_id][3]
-            return (construct_path(path_bin, curr.stop_id), delta_t)
+            return (construct_filtered_path(path_bin, curr.stop_id), delta_t)
 
         # Note that this only works if the heuristic is both consistent and admissible. Then
         # the arrival time to the current stop will be on the optimal path, and therefore we
@@ -211,6 +211,7 @@ def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]],
         else:
             path.append((curr_trip, start_stop, end_stop))
             end_stop = start_stop
+            start_stop = path_bin[curr_id][1]
             curr_trip = path_bin[curr_id][0]
         curr_id = path_bin[curr_id][1]
 

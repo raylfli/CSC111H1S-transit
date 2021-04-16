@@ -321,16 +321,18 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
         if zoom_b[0].on_click(event):  # Zoom in
             if (new_zoom := clamp(zoom + 1)) != zoom:
-                x = clamp(x / images[zoom].width * images[new_zoom].width, -images[new_zoom].width + map_bound.width, 0)
-                y = clamp(y / images[zoom].height * images[new_zoom].height, -images[new_zoom].height + map_bound.height, 0)
+                x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[new_zoom].width - map_bound.width / 2), -images[new_zoom].width + map_bound.width, 0)
+                y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[new_zoom].height - map_bound.height / 2), -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
         elif zoom_b[1].on_click(event):  # Zoom out
             if (new_zoom := clamp(zoom - 1)) != zoom:
-                x = clamp(x / images[zoom].width * images[new_zoom].width, -images[new_zoom].width + map_bound.width,
+                x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[
+                    new_zoom].width - map_bound.width / 2), -images[new_zoom].width + map_bound.width,
                           0)
-                y = clamp(y / images[zoom].height * images[new_zoom].height, -images[new_zoom].height + map_bound.height, 0)
+                y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[
+                    new_zoom].height - map_bound.height / 2), -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True

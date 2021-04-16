@@ -330,14 +330,14 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
             clicked = True
         elif settings_b[0].on_click(event) and len(waypoints) == 2:
             # print(f'Waypoints num: {len(waypoints["pts"])}')
-            time = int(settings_l[1].text) * 3600 + int(settings_l[2].text) * 60 + int(
-                settings_l[3].text)
+            time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
+                settings_l[6].text)
             path.get_shapes(waypoints[0].get_lat_lon(),
                             waypoints[1].get_lat_lon(),
                             pathfinding.find_route(waypoints[0].get_lat_lon(),
                                                    waypoints[1].get_lat_lon(),
                                                    time,
-                                                   DAY_TO_INT[settings_dd[0]], graph))
+                                                   DAY_TO_INT[settings_dd[0].selected], graph))
             path.set_visible(True)
         elif settings_b[1].on_click(event):
             waypoints = []

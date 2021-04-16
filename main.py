@@ -16,7 +16,7 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
 import data_interface
 from graph import Graph
-from pathfinding import find_route
+from pathfinding import find_route, a_star
 
 
 def load_graph() -> Graph():
@@ -31,19 +31,22 @@ def load_graph() -> Graph():
     g = Graph()
     data_interface.init_db('data/')
     q = data_interface.TransitQuery()
-
+    print('load db')
     for vertex in q.get_stops():
         g.add_vertex(vertex[0], vertex[1])
-
+    print('add vertex')
     for edge in q.get_edges():
         g.add_edge(edge[0], edge[1])
-
+    print('add edge')
     return g
 
 
 if __name__ == '__main__':
     # download_data()
     print(find_route((43.776222, -79.347048), (43.787739, -79.334818), 62429, 7, load_graph()))
+    # g = load_graph()
+    # q = data_interface.TransitQuery()
+    # print(a_star(g.get_vertex(14155), g.get_vertex(9392), 62429, 7, q, g))
 
     # import python_ta
     # # todo modify the PyTA check

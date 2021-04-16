@@ -2,6 +2,7 @@
 from collections import defaultdict
 from queue import PriorityQueue
 from math import inf
+from typing import Union
 
 from graph import _Vertex, Graph
 from data_interface import TransitQuery
@@ -21,17 +22,28 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     """
     query = TransitQuery()
 
-    start_id = query.get_closest_stop(start_loc[0], start_loc[1])
-    end_id = query.get_closest_stop(end_loc[0], end_loc[1])
+    start_id = query.get_closest_stops(start_loc[0], start_loc[1])
+    end_id = query.get_closest_stops(end_loc[0], end_loc[1])
 
-    return a_star(graph.get_vertex(start_id), graph.get_vertex(end_id), time, day, query)
+    paths = []
+    # print(f'length start_id: {len(start_id)}')
+    # print(f'length end_id: {len(end_id)}')
+
+    for id1 in start_id:
+        for id2 in end_id:
+            print((id1, id2))
+            paths.append(a_star(graph.get_vertex(id1), graph.get_vertex(id2), time, day, query, graph))
+
+    return min(paths, key=lambda x: x[1])[0]
 
 
-def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQuery)\
-        -> list[tuple[int, int, int]]:
+def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQuery, graph: Graph)\
+        -> tuple[list[tuple[int, int, int]], Union[int, float]]:
     """A* algorithm for graph pathfinding.
 
     The inputs to this function are given as stop_ids.
+
+    Returns a tuple of the path and the time the path takes, in seconds.
     """
 
     # heap of nodes to look at, sorted by f_score. The f_score of any given node n is g_score(n) +
@@ -42,48 +54,97 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
 
     # For a stop_id n, path_bin[n] is the information for the trip/edge connecting it to the
     # previous node. The information is given as a tuple:
-    # (trip_id, start stop_id, end stop_id, time arrived)
+    # (trip_id, start stop_id, end stop_id, time arrived, day)
     path_bin = {}
 
     # score of cheapest path from start to curr currently known
     g_score = defaultdict(lambda: inf)
     g_score[start] = 0
 
+    # bar_revisit = set()
+
     while not open_set.empty():
         curr = open_set.get()[1]
+        # print(f'Open node: {curr.stop_id}')
+        # bar_revisit.add(curr.stop_id)
 
         if curr == goal:
             # Use construct_path for a path with all stops included
             # Use construct_filtered_path for a path that only describe entire trip segments
-            return construct_path(path_bin, curr.stop_id)
+            # print(f'Day arrival: {path_bin[curr.stop_id][4]}   Day departure: {day}')
+            delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + path_bin[curr.stop_id][3]
+            return (construct_path(path_bin, curr.stop_id), delta_t)
+
+        # neighbour_id = set()
 
         for neighbour in curr.get_neighbours():
+            # print(f'    Transiting to: {curr.stop_id} -> {neighbour.stop_id}')
+            # neighbour_id.add(neighbour.stop_id)
             # Note that this only works if the heuristic is both consistent and admissible. Then
             # the arrival time to the current stop will be on the optimal path, and therefore we
             # want to query all stops connected to this stop after this time
             t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
             # If the time rolls over to the next day, query using the next day's timetable
-            d = (day + 1) % 7 if t - time < 0 else day
+            d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
+            # if day != (day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]):
+            #     print('different day')
             # Returned as (trip_id, day, time_dep, time_arr, dist)
             edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
-            # optimize for both distance travelled between stops and time taken to reach next stop
-            # if (delta_t := edge[2]86400 - t) >= 0:
-            #     edge_weight = edge[3] * delta_t
-            # else:
-            #     edge_weight = edge[3] * (delta_t + 86400)
-            edge_weight = edge[4] * (86400 - t + (edge[1] - d - 1) * 86400 + edge[3])
-            temp_gscore = g_score[curr] + edge_weight
+            if edge is not None:
+                # optimize for both distance travelled between stops and time taken to reach next stop
+                if edge[3] - edge[2] >= 0:
+                    # edge_weight = edge[3] * delta_t
+                    day_arrival = edge[1]
+                else:
+                    # edge_weight = edge[3] * (delta_t + 86400)
+                    day_arrival = edge[1] + 1
+                edge_weight = edge[4] * (86400 - t + (((day_arrival - d) % 7) - 1) * 86400 + edge[3])
+                # print(f'    Transit edge: {edge_weight}')
+                temp_gscore = g_score[curr] + edge_weight
 
-            if temp_gscore < g_score[neighbour]:
-                # record optimum path
-                path_bin[neighbour.stop_id] = (edge[0], curr.stop_id, neighbour.stop_id, edge[3])
-                g_score[neighbour] = temp_gscore  # update g_score for neighbour
+                if temp_gscore < g_score[neighbour]:
+                    # record optimum path
+                    path_bin[neighbour.stop_id] = (edge[0], curr.stop_id, neighbour.stop_id, edge[3], (day_arrival - 1) % 7 + 1)
+                    g_score[neighbour] = temp_gscore  # update g_score for neighbour
 
-                # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
-                # node removed from open_set is guaranteed to be optimal. Then by extension we know
-                # we are not pushing any "bad" nodes.
-                f_score = g_score[neighbour] + h(curr, goal)
-                open_set.put((f_score, neighbour))
+                    # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
+                    # node removed from open_set is guaranteed to be optimal. Then by extension we know
+                    # we are not pushing any "bad" nodes.
+                    f_score = g_score[neighbour] + h(neighbour, goal)
+                    open_set.put((f_score, neighbour))
+        # walking = query.get_closest_stops(curr.location[0], curr.location[1], 0.25)
+        # print(f'Walking stops: {len(walking)}')
+        for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.25):
+            if stop != curr.stop_id:
+            # if stop not in neighbour_id and stop != curr.stop_id and stop not in bar_revisit:
+            #     print(f'    Walking to: {curr.stop_id} -> {stop}')
+                node = graph.get_vertex(stop)
+
+                t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
+                d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
+
+                delta_d = distance(curr.location, node.location)
+                delta_t = delta_d / 0.0014
+                edge_weight = delta_d * delta_t
+                # print(f'    Walking edge: {edge_weight}')
+                temp_gscore = g_score[curr] + edge_weight
+
+                if temp_gscore < g_score[node]:
+                    if t + delta_t > 86400:
+                        d += 1
+                    # record optimum path
+                    path_bin[stop] = (0, curr.stop_id, stop, (t + delta_t) % 86400, (d - 1) % 7 + 1)
+                    g_score[node] = temp_gscore  # update g_score for neighbour
+
+                    # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
+                    # node removed from open_set is guaranteed to be optimal. Then by extension we know
+                    # we are not pushing any "bad" nodes.
+                    f_score = g_score[node] + h(node, goal)
+                    open_set.put((f_score, node))
+        # print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')
+        # if curr.stop_id == 7723:
+        #     print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')
+    return ([(0, 0, 0)], inf)
 
 
 def h(curr: _Vertex, goal: _Vertex) -> float:
@@ -95,7 +156,7 @@ def h(curr: _Vertex, goal: _Vertex) -> float:
     return distance(curr.location, goal.location)
 
 
-def construct_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)\
+def construct_path(path_bin: dict[int, tuple[int, int, int, int, int]], goal_id: int)\
         -> list[tuple[int, int, int]]:
     """Return a path constructed using path_bin. Note that the path returned is in reverse order:
     the first element is the final stop.
@@ -106,11 +167,12 @@ def construct_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)
     while curr_id in path_bin.keys():
         path.append(path_bin[curr_id][:3])
         curr_id = path_bin[curr_id][1]
+        # print(f'Path: {path}')
 
     return path
 
 
-def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int]], goal_id: int)\
+def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]], goal_id: int)\
         -> list[tuple[int, int, int]]:
     """Return a path constructed using path_bin. Note that the path returned is in reverse order:
     the first element is the final stop. The stops returned in each tuple are the start and end

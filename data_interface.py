@@ -16,38 +16,9 @@ import csv
 import logging
 import os
 import sqlite3
-from pathlib import Path
 from typing import Optional, Union
-from zipfile import ZipFile
-
-import requests
 
 import util
-
-
-# ---------- DATA DOWNLOAD ---------- #
-
-def download_data(data_dir: str = 'data/') -> None:
-    """Download and extract the TTC Routes and Schedules Data.
-
-    Link: https://open.toronto.ca/dataset/ttc-routes-and-schedules/
-    """
-    formatted_data_dir = data_dir if data_dir.endswith('/') else data_dir + '/'
-    Path(data_dir).mkdir(parents=True, exist_ok=True)  # create file path if not exists
-
-    url = "https://ckan0.cf.opendata.inter.prod-toronto.ca/download_resource/c1264e07-3c27-490f" \
-          "-9362-42c1c8f03708"
-    zip_file_path = f'{formatted_data_dir}data.zip'
-
-    r = requests.get(url, stream=True)
-    with open(zip_file_path, mode='wb') as f:
-        for chunk in r.iter_content(chunk_size=128):
-            f.write(chunk)
-
-    with ZipFile(zip_file_path, mode='r') as zip_file:
-        zip_file.extractall(formatted_data_dir)
-
-    os.remove(zip_file_path)
 
 
 # ---------- DATABASE CREATION ---------- #
@@ -213,12 +184,12 @@ def _insert_stop_times_file(file_path: str, con: sqlite3.Connection) -> None:
             arr_time_split = row[1].split(':')
             dep_time_split = row[2].split(':')
             values = (row[0],
-                      (int(arr_time_split[0]) * 3600 +
-                       int(arr_time_split[1]) * 60 +
-                       int(arr_time_split[2])),
-                      (int(dep_time_split[0]) * 3600 +
-                       int(dep_time_split[1]) * 60 +
-                       int(dep_time_split[2])),
+                      (int(arr_time_split[0]) * 3600
+                       + int(arr_time_split[1]) * 60
+                       + int(arr_time_split[2])),
+                      (int(dep_time_split[0]) * 3600
+                       + int(dep_time_split[1]) * 60
+                       + int(dep_time_split[2])),
                       row[3], row[4], row[5], row[6], row[7],
                       0 if row[8] == '' else row[8])
             con.execute("""INSERT INTO stop_times VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""", values)
@@ -663,14 +634,25 @@ class TransitQuery:
 
 
 if __name__ == '__main__':
-    # TODO ADD PYTA CHECK
+    import python_ta.contracts
+    python_ta.contracts.check_all_contracts()
+
+    import doctest
+    doctest.testmod()
+
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['csv', 'logging', 'os', 'sqlite3', 'pathlib', 'typing', 'zipfile',
+                          'requests', 'util'],
+        'allowed-io': ['download_data', 'init_db', '_insert_file', '_insert_stop_times_file'],
+        'max-line-length': 100,
+        'disable': ['E1136']
+    })
 
     # logging.basicConfig(level=logging.DEBUG)
     # logging.basicConfig(level=logging.INFO)
 
     data_directory = 'data/'
-
-    download_data(data_directory)  # can be removed after files are present
 
     # init_db(data_directory, force=True)
     init_db(data_directory)

@@ -197,3 +197,19 @@ def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]],
 
     path.append((curr_trip, start_stop, end_stop))
     return path
+
+
+if __name__ == '__main__':
+    import python_ta.contracts
+    python_ta.contracts.check_all_contracts()
+
+    import doctest
+    doctest.testmod()
+
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['collections', 'queue', 'math', 'graph', 'data_interface', 'util'],
+        'allowed-io': [],
+        'max-line-length': 100,
+        'disable': ['E1136']
+    })

@@ -50,7 +50,7 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
     # h(n), i.e. the shortest path currently known to this node + estimated distance to the goal
     # based on the heuristic
     open_set = PriorityQueue()
-    open_set.put((h(start, goal), start))
+    open_set.put((h(start, goal), 0, start))
 
     # For a stop_id n, path_bin[n] is the information for the trip/edge connecting it to the
     # previous node. The information is given as a tuple:
@@ -62,9 +62,9 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
     g_score[start] = 0
 
     # bar_revisit = set()
-
+    push_counter = 0
     while not open_set.empty():
-        curr = open_set.get()[1]
+        curr = open_set.get()[2]
         # print(f'Open node: {curr.stop_id}')
         # bar_revisit.add(curr.stop_id)
 
@@ -111,7 +111,8 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
                     # node removed from open_set is guaranteed to be optimal. Then by extension we know
                     # we are not pushing any "bad" nodes.
                     f_score = g_score[neighbour] + h(neighbour, goal)
-                    open_set.put((f_score, neighbour))
+                    open_set.put((f_score, push_counter, neighbour))
+                    push_counter += 1
         # walking = query.get_closest_stops(curr.location[0], curr.location[1], 0.25)
         # print(f'Walking stops: {len(walking)}')
         for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.25):
@@ -140,7 +141,8 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
                     # node removed from open_set is guaranteed to be optimal. Then by extension we know
                     # we are not pushing any "bad" nodes.
                     f_score = g_score[node] + h(node, goal)
-                    open_set.put((f_score, node))
+                    open_set.put((f_score, push_counter, node))
+                    push_counter += 1
         # print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')
         # if curr.stop_id == 7723:
         #     print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')

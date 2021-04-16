@@ -43,7 +43,7 @@ def load_graph() -> Graph():
 
 if __name__ == '__main__':
     # download_data()
-    print(find_route((43.776222, -79.347048), (43.787739, -79.334818), 62429, 7, load_graph()))
+    print(find_route((43.754885575, -79.4761333067291), (43.771236325000004, -79.43310625498007), 0, 1, load_graph()))
     # g = load_graph()
     # q = data_interface.TransitQuery()
     # print(a_star(g.get_vertex(14155), g.get_vertex(9392), 62429, 7, q, g))

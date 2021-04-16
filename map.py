@@ -208,11 +208,11 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     zoom_b = [PygButton(x=map_bound.width - PADDING - 30,
                         y=map_bound.height - PADDING - 2 * 30 - 10,
                         width=30, height=30,
-                        x_adjust=-200, draw_func=lambda a, b, c, d, e: draw_zoom_in(a, b, c, d, e)),
+                        x_adjust=-200, draw_func=draw_zoom_in),
               PygButton(x=map_bound.width - PADDING - 30,
                         y=map_bound.height - PADDING - 30,
                         width=30, height=30,
-                        x_adjust=-200, draw_func=lambda a, b, c, d, e: draw_zoom_out(a, b, c, d, e))]
+                        x_adjust=-200, draw_func=draw_zoom_out)]
 
     time_nums = [0, 0, 0]
 
@@ -228,17 +228,17 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
     settings_b = [PygButton(25, 500, 150, 20, "Get Route", font, txt_align=1),
                   PygButton(25, 540, 150, 20, "Reset", font, txt_align=1),
-                  PygButton(135, 100, 9, 9, draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)), # hour inc
+                  PygButton(135, 100, 9, 9, draw_func=draw_inc),  # hour inc
                   PygButton(135, 111, 9, 9,
-                            draw_func=lambda a, b, c, d, e: draw_dec(a, b, c, d, e)),  # hour dec
+                            draw_func=draw_dec),  # hour dec
                   PygButton(135, 125, 9, 9,
-                            draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)),  # hour inc
+                            draw_func=draw_inc),  # minute inc
                   PygButton(135, 136, 9, 9,
-                            draw_func=lambda a, b, c, d, e: draw_dec(a, b, c, d, e)),  # hour inc
+                            draw_func=draw_dec),  # minute dec
                   PygButton(135, 150, 9, 9,
-                            draw_func=lambda a, b, c, d, e: draw_inc(a, b, c, d, e)),  # hour inc
+                            draw_func=draw_inc),  # second inc
                   PygButton(135, 161, 9, 9,
-                            draw_func=lambda a, b, c, d, e: draw_dec(a, b, c, d, e))]  # hour inc
+                            draw_func=draw_dec)]  # second dec
 
     settings_dd = [PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)]
 

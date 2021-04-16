@@ -36,6 +36,8 @@ class PygButton:
 
     _rect: Rect
     _bg_color: pygame.Color
+    _depress_color: pygame.Color
+    _dep: bool
     _image: Optional[pygame.Surface]
     _image_mode: int
     _text: Optional[str]
@@ -43,7 +45,6 @@ class PygButton:
     _txt_col: Optional[tuple[int, int, int]]
     _txt_align: int
     _txt_surface: Optional[pygame.Surface]
-    _visible: bool
     _adjust: tuple[int, int]
     _draw_func: Callable
 
@@ -51,7 +52,8 @@ class PygButton:
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  txt_col: tuple[int, int, int] = (0, 0, 0),
                  txt_align: int = 0,
-                 visible: bool = True, color: tuple[int, int, int] = (255, 255, 255),
+                 color: tuple[int, int, int] = (255, 255, 255),
+                 depress_color: tuple[int, int, int] = (200, 200, 200),
                  image: str = None, image_mode: int = 0,
                  x_adjust: int = 0, y_adjust: int = 0,
                  draw_func: Callable = None):
@@ -67,9 +69,10 @@ class PygButton:
             - 2 for right align, bottom align # TODO
         """
         self._rect = Rect(x, y, width, height)
-        self._visible = visible
         self._image_mode = image_mode
         self._bg_color = pygame.Color(color)
+        self._depress_color = pygame.Color(depress_color)
+        self._dep = False
         self._set_text(text, font, txt_col, txt_align)
         self._adjust = (x_adjust, y_adjust)
         self._draw_func = draw_func
@@ -100,44 +103,51 @@ class PygButton:
 
     def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
         """Draw this button."""
-        if self._visible:
+        if not self._dep:
             pygame.draw.rect(surface, self._bg_color,
                              (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
+        else:
+            pygame.draw.rect(surface, self._depress_color,
+                             (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
 
-            if self._text is not None:
-                width, height = self._txt_surface.get_size()
-                if self._txt_align == 0:
-                    surface.blit(self._txt_surface, (self._rect.x + self._rect.width / 15,
-                                                     max(self._rect.y,
-                                                         self._rect.y + self._rect.height - height)),
-                                 pygame.Rect(0, max(0, height - self._rect.height),
-                                             self._rect.width, self._rect.height))
-                elif self._txt_align == 1:
-                    surface.blit(self._txt_surface, (max(self._rect.x, (self._rect.width - width) / 2 + self._rect.x),
-                                                     max(self._rect.y,
-                                                         self._rect.y + (self._rect.height - height) / 2)),
-                                 pygame.Rect(max(0, (width - self._rect.width) / 2), max(0, (height - self._rect.height) / 2),
-                                             self._rect.width, self._rect.height))
-                elif self._txt_align == 2:
-                    surface.blit(self._txt_surface, (max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
-                                                     max(self._rect.y,
-                                                         self._rect.y + self._rect.height - height)),
-                                 pygame.Rect(max(0, width - self._rect.width), max(0, height - self._rect.height),
-                                             self._rect.width, self._rect.height))
+        if self._text is not None:
+            width, height = self._txt_surface.get_size()
+            if self._txt_align == 0:
+                surface.blit(self._txt_surface, (self._rect.x + self._rect.width / 15,
+                                                 max(self._rect.y,
+                                                     self._rect.y + self._rect.height - height)),
+                             pygame.Rect(0, max(0, height - self._rect.height),
+                                         self._rect.width, self._rect.height))
+            elif self._txt_align == 1:
+                surface.blit(self._txt_surface, (max(self._rect.x, (self._rect.width - width) / 2 + self._rect.x),
+                                                 max(self._rect.y,
+                                                     self._rect.y + (self._rect.height - height) / 2)),
+                             pygame.Rect(max(0, (width - self._rect.width) / 2), max(0, (height - self._rect.height) / 2),
+                                         self._rect.width, self._rect.height))
+            elif self._txt_align == 2:
+                surface.blit(self._txt_surface, (max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
+                                                 max(self._rect.y,
+                                                     self._rect.y + self._rect.height - height)),
+                             pygame.Rect(max(0, width - self._rect.width), max(0, height - self._rect.height),
+                                         self._rect.width, self._rect.height))
 
-            if self._image is not None:
-                if self._image_mode == 1:
-                    surface.blit(self._image, (self._rect.x, self._rect.y),
-                                 pygame.Rect(0, 0, self._rect.width, self._rect.height))
+        if self._image is not None:
+            if self._image_mode == 1:
+                surface.blit(self._image, (self._rect.x, self._rect.y),
+                             pygame.Rect(0, 0, self._rect.width, self._rect.height))
 
-            if self._draw_func is not None:
-                self._draw_func(surface, self._rect.x, self._rect.y, self._rect.width, self._rect.height)
+        if self._draw_func is not None:
+            self._draw_func(surface, self._rect.x, self._rect.y, self._rect.width, self._rect.height)
 
     def on_click(self, event: pygame.event.Event) -> bool:
         """Return true if the event clicked this button."""
         if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (True, False, False):
             x, y = pygame.mouse.get_pos()
-            return self._rect.contains(x + self._adjust[0], y + self._adjust[1])
+            if self._rect.contains(x + self._adjust[0], y + self._adjust[1]):
+                self._dep = True
+                return True
+        if event.type == pygame.MOUSEBUTTONUP:
+            self._dep = False
         return False
 
     # def set_visible(self, value: bool) -> None:

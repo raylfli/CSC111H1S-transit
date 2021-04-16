@@ -71,7 +71,7 @@ class PygButton(Button):
 
     def set_text(self, text: str = None,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
-                 txt_col: tuple[int, int, int] = (0, 0, 0),) -> None:
+                 txt_col: tuple[int, int, int] = (0, 0, 0)) -> None:
         """..."""
         if text is not None:
             self._text = text

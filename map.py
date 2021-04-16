@@ -212,8 +212,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     # PATH TESTER
     path = Path()
     path._routes = {62667: {}}
-    path.shapes = {62667:
-                       [(43.760348, -79.410691), (43.759892, -79.410757), (43.743248, -79.405991)]}
+    path.shapes = [(43.760348, -79.410691), (43.759892, -79.410757), (43.743248, -79.405991)]
 
     # Start the event loop
     while True:

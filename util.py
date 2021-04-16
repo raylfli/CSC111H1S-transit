@@ -1,4 +1,6 @@
-"""Utility functions
+"""TTC Route Planner for Toronto, Ontario -- Utility Functions
+
+This module provides various utility functions that are used in other modules.
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
@@ -84,7 +86,16 @@ def stringify_day_num(day_num: int) -> str:
 
 
 if __name__ == '__main__':
-    # TODO ADD PYTA CHECK
+    import python_ta.contracts
+    python_ta.contracts.check_all_contracts()
 
     import doctest
     doctest.testmod()
+
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['math'],
+        'allowed-io': [],
+        'max-line-length': 100,
+        'disable': ['E1136']
+    })

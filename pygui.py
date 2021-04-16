@@ -231,3 +231,58 @@ class PygDropdown(Button):
                 else:
                     # print('deactivate')
                     self._active = False
+
+
+class PygLabel:
+    """Text label. Does NOT support multiline labels.
+    """
+    _rect: Rect
+    _font: pygame.font.Font
+    _text: str
+    _text_col: tuple[int, int, int]
+    _bg_col: Optional[pygame.Color]
+    _text_surface: Optional[pygame.Surface]
+
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 text: str,
+                 font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                 text_color: tuple[int, int, int] = (0, 0, 0),
+                 background_color: Optional[tuple[int, int, int]] = None) -> None:
+        """Initialize PygLabel.
+        """
+        self._rect = Rect(x, y, width, height)
+        self._font = pygame.font.SysFont(font[0], font[1])
+        self.set_text(text, font, text_color)
+
+        if background_color is not None:
+            self._bg_col = pygame.Color(background_color)
+        else:
+            self._bg_col = None
+
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
+        """Draw this label
+        """
+        # draw background
+        if self._bg_col is not None:
+            pygame.draw.rect(surface, self._bg_col,
+                             pygame.Rect(self._rect.x,
+                                         self._rect.y,
+                                         self._rect.width,
+                                         self._rect.height))
+
+        # draw text
+        width, height = self._text_surface.get_size()
+        surface.blit(self._text_surface,
+                     pygame.Rect(self._rect.x + self._rect.width / 2 - width / 2,
+                                 self._rect.y + self._rect.height / 2 - height / 2,
+                                 self._rect.width,
+                                 self._rect.height))
+
+    def set_text(self, text: str = None,
+                 font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                 text_col: tuple[int, int, int] = (0, 0, 0)) -> None:
+        """Set this label's text."""
+        self._text = text
+        self._text_col = text_col
+        self._font = pygame.font.SysFont(font[0], font[1])
+        self._text_surface = self._font.render(text, True, text_col)

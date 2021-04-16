@@ -261,6 +261,7 @@ class PygLabel:
             - 0 for left align, bottom align
             - 1 for center align, middle align
             - 2 for right align, bottom align # TODO
+            - 3 for left align, top align
     """
     _rect: Rect
     _font: pygame.font.Font
@@ -287,8 +288,8 @@ class PygLabel:
         else:
             self._bg_col = None
 
-    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
-        """Draw this label
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType], padding: int = 5) -> None:
+        """Draw this label.
         """
         # draw background
         if self._bg_col is not None:
@@ -322,6 +323,9 @@ class PygLabel:
                          pygame.Rect(max(0, width - self._rect.width),
                                      max(0, height - self._rect.height),
                                      self._rect.width, self._rect.height))
+        elif self._txt_align == 3:
+            surface.blit(self._text_surface, (self._rect.x + padding,
+                                              self._rect.y + padding))
 
     def _set_text(self, text: str = None,
                   font: tuple[str, int] = (pygame.font.get_default_font(), 20),
@@ -338,3 +342,133 @@ class PygLabel:
         if text is not None:
             self.text = text
             self._text_surface = self._font.render(text, True, self._text_col)
+
+    def get_dimensions(self) -> tuple[int, int]:
+        """Return the width and height of the PygLabel."""
+        return self._text_surface.get_size()
+
+
+class PygMultiLabel:
+    """Multiline pygame label."""
+    _rect: Rect
+    _visible: bool
+    labels: list[PygLabel]
+    shown_text: list[str]
+    not_shown_text: list[str]
+    cont: bool
+
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 text, font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                 text_color: tuple[int, int, int] = (0, 0, 0),
+                 background_color: Optional[tuple[int, int, int]] = None,
+                 txt_align: int = 3, visible: bool = False) -> None:
+        """Initialize PygMultiLabel."""
+        self._rect = Rect(x, y, width, height)
+        self._visible = visible
+        self._set_text(text, font, text_color, background_color, txt_align)
+
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
+        """Draw labels in pygame."""
+        if self._visible:
+            for label in self.labels:
+                label.draw(surface)
+
+    def _set_text(self, text: list[str] = None,
+                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                  background_color: Optional[tuple[int, int, int]] = None,
+                  text_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 3,
+                  padding: int = 5) -> None:
+        """Set this label's text."""
+        self.labels = []
+        self.shown_text = []
+        i = 0
+        text_height = 0
+        while (i < len(text)) and \
+                (self._rect.y + i * (text_height + padding) < self._rect.y + self._rect.height):
+            self.shown_text.append(text[i])
+            if i == 0:
+                new_label = PygLabel(self._rect.x, self._rect.y,
+                                     self._rect.width, self._rect.height, text[i],
+                                     font, text_col, background_color, txt_align)
+                self.labels.append(new_label)
+            else:
+                text_width, text_height = self.labels[i - 1].get_dimensions()
+                new_label = PygLabel(self._rect.x,
+                                     self._rect.y + i * (text_height + padding),
+                                     self._rect.width, text_height + padding, text[i],
+                                     font, text_col, background_color, txt_align)
+                self.labels.append(new_label)
+            i += 1
+
+        if i >= len(text):
+            self.cont = False
+            self.not_shown_text = []
+        else:
+            self.cont = True
+            self.not_shown_text = text[i:]
+
+    def set_visible(self, value: bool) -> None:
+        """Set visibility of PygMultiLine."""
+        self._visible = value
+
+
+class PygPageLabel:
+    """Pages of Multiline Labels."""
+    _visible: bool
+    _selected: int
+    pages: list[PygMultiLabel]
+    buttons: Optional[tuple[PygButton, PygButton]]
+
+    def __init__(self, x: int, y: int, width: int, height: int,
+                 text: list[str], font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                 text_color: tuple[int, int, int] = (0, 0, 0),
+                 background_color: Optional[tuple[int, int, int]] = None,
+                 txt_align: int = 3, visible: bool = False,
+                 button_width: int = 9) -> None:
+        """Initialize a PygPageLabel object."""
+        self._visible = visible
+        self.pages = []
+        self._selected = 0
+        label = PygMultiLabel(x, y, width, height, text, font,
+                              text_color, background_color, txt_align, visible)
+        self.pages.append(label)
+
+        if label.cont:
+            self.buttons = (PygButton(x - button_width, y + height // 2,
+                                      button_width, button_width, font=font, text='<'),
+                            PygButton(x + width, y + height // 2,
+                                      button_width, button_width, font=font, text='>'))
+        else:
+            self.buttons = None
+
+        while label.cont:
+            label = PygMultiLabel(x, y, width, height, label.not_shown_text, font,
+                                  text_color, background_color, txt_align, visible)
+            self.pages.append(label)
+
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
+        """Draw pages."""
+        if self._visible:
+            self.pages[self._selected].draw(surface)
+            if self.buttons is not None:
+                for button in self.buttons:
+                    button.draw(surface)
+
+    def on_click(self, event: pygame.event) -> bool:
+        """Return true if a button is clicked."""
+        if self.buttons is not None:
+            return self.buttons[0].on_click(event) or self.buttons[1].on_click(event)
+        else:
+            return False
+
+    def on_select(self, event: pygame.event) -> None:
+        """Change page when selected."""
+        if self.buttons is not None:
+            if self.buttons[0].on_click(event):
+                self._selected = max(min(self._selected - 1, len(self.pages) - 1), 0)
+            elif self.buttons[1].on_click(event):
+                self._selected = max(min(self._selected + 1, len(self.pages) - 1), 0)
+
+    def set_visible(self, value: bool) -> None:
+        """Set visibility."""
+        self._visible = value

@@ -8,7 +8,7 @@ To-do:
 import pygame
 import pathfinding
 from image import Image, load_images
-from pygui import PygButton, PygDropdown, PygLabel, Rect
+from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel
 from waypoint import Waypoint
 from path import Path
 from typing import Union
@@ -131,7 +131,7 @@ def continue_scroll(image: Image, width: int, height: int, x: int, y: int,
 
 
 def clamp(num, min_value: int = 0, max_value: int = 3):
-    """..."""
+    """Return the clamped value."""
     return max(min(num, max_value), min_value)
 
 
@@ -242,6 +242,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
     settings_dd = [PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)]
 
+    routes = PygPageLabel(20, 200, 160, 250, [], font=font, background_color=(255, 255, 255))
+
     # buttons = {ZOOM: [PygButton(x=map_bound.width - PADDING - button_width,
     #                             y=map_bound.height - PADDING - 2 * button_height,
     #                             width=button_width, height=button_height,
@@ -277,8 +279,6 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     # create path
     path = Path()
 
-    # label = PygLabel(200, 200, 100, 50, 'Lorem Ipsum', background_color=(255, 255, 255))
-
     # Start the event loop
     while True:
         # Draw map area
@@ -303,6 +303,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         for dropdown in settings_dd:
             dropdown.draw(screen)
         # draw_buttons(screen, buttons, map_bound.width, map_bound.height)
+        routes.draw(screen)
 
         pygame.display.flip()
 
@@ -341,9 +342,12 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
                                                    time,
                                                    DAY_TO_INT[settings_dd[0].selected], graph))
             path.set_visible(True)
+            routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
+                                  font=font, background_color=(255, 255, 255), visible=True)
         elif settings_b[1].on_click(event):
             waypoints = []
             path.set_visible(False)
+            routes.set_visible(False)
             # print(f'Waypoints num: {len(waypoints["pts"])}')
         elif settings_b[2].on_click(event):  # hour inc
             time_nums[0] = (time_nums[0] + 1) % 24
@@ -363,6 +367,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         elif settings_b[7].on_click(event):  # second dec
             time_nums[2] = (time_nums[2] - 1) % 60
             settings_l[6].set_text(str(time_nums[2]))  # refresh time label
+        elif routes.on_click(event):
+            routes.on_select(event)
 
         for dropdown in settings_dd:
             dropdown.on_select(event)

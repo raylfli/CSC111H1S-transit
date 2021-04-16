@@ -390,6 +390,9 @@ class PygMultiLabel:
                 new_label = PygLabel(self._rect.x, self._rect.y,
                                      self._rect.width, self._rect.height, text[i],
                                      font, text_col, background_color, txt_align)
+                # text_width, text_height = new_label.get_dimensions()
+                # if text_width > self._rect.width:
+                #     new_text = text[i].split()
                 self.labels.append(new_label)
             else:
                 text_width, text_height = self.labels[i - 1].get_dimensions()

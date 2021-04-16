@@ -320,14 +320,17 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
         if zoom_b[0].on_click(event):  # Zoom in
             if (new_zoom := clamp(zoom + 1)) != zoom:
+                x = clamp(x / images[zoom].width * images[new_zoom].width, -images[new_zoom].width + map_bound.width, 0)
+                y = clamp(y / images[zoom].height * images[new_zoom].height, -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
-                x, y = 0, 0
                 tile = load_zoom_image(images, zoom)
             clicked = True
         elif zoom_b[1].on_click(event):  # Zoom out
             if (new_zoom := clamp(zoom - 1)) != zoom:
+                x = clamp(x / images[zoom].width * images[new_zoom].width, -images[new_zoom].width + map_bound.width,
+                          0)
+                y = clamp(y / images[zoom].height * images[new_zoom].height, -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
-                x, y = 0, 0
                 tile = load_zoom_image(images, zoom)
             clicked = True
         elif settings_b[0].on_click(event) and len(waypoints) == 2:
@@ -370,7 +373,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         mouse_x, mouse_y = pygame.mouse.get_pos()
 
         # Scroll and point logic
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (
+        True, False, False):
             # mouse_x, mouse_y = pygame.mouse.get_pos()
 
             if map_bound.contains(mouse_x, mouse_y) and not clicked:
@@ -379,10 +383,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
                 down = True
 
         if event.type == pygame.MOUSEBUTTONUP:
-            down = False
-
             # Clicked point
-            if not (scroll or clicked) and map_bound.contains(mouse_x, mouse_y):
+            if not (scroll or clicked) and map_bound.contains(mouse_x, mouse_y) and down:
                 mouse_x -= map_bound.x
                 mouse_y -= map_bound.y
                 # get lat/lon
@@ -391,6 +393,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
             else:
                 scroll = False
                 clicked = False
+            down = False
 
         if event.type == pygame.MOUSEMOTION:
             # scroll if mouse down

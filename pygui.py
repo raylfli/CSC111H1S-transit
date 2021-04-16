@@ -135,18 +135,18 @@ class PygButton:
 
     def on_click(self, event: pygame.event.Event) -> bool:
         """Return true if the event clicked this button."""
-        if event.type == pygame.MOUSEBUTTONDOWN:
+        if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (True, False, False):
             x, y = pygame.mouse.get_pos()
             return self._rect.contains(x + self._adjust[0], y + self._adjust[1])
         return False
 
-    def set_visible(self, value: bool) -> None:
-        """Set button as visible."""
-        self._visible = value
+    # def set_visible(self, value: bool) -> None:
+    #     """Set button as visible."""
+    #     self._visible = value
 
-    def get_text(self) -> str:
-        """Return button text."""
-        return self._text
+    # def get_text(self) -> str:
+    #     """Return button text."""
+    #     return self._text
 
 
 class PygDropdown:
@@ -221,15 +221,15 @@ class PygDropdown:
                      pygame.Rect(0, max(0, height - self._rect.height),
                                  self._rect.width, self._rect.height))
 
-    def on_click(self, event: pygame.event.Event) -> bool:
-        """Return true if the event clicked this button."""
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            x, y = pygame.mouse.get_pos()
-            if self._active:
-                return self._rect.contains(x, y) or self._stack_rect.contains(x, y)
-            else:
-                return self._rect.contains(x, y)
-        return False
+    # def on_click(self, event: pygame.event.Event) -> bool:
+    #     """Return true if the event clicked this button."""
+    #     if event.type == pygame.MOUSEBUTTONDOWN:
+    #         x, y = pygame.mouse.get_pos()
+    #         if self._active:
+    #             return self._rect.contains(x, y) or self._stack_rect.contains(x, y)
+    #         else:
+    #             return self._rect.contains(x, y)
+    #     return False
 
     def on_select(self, event: pygame.event.Event):
         """On select, either activates or deactivates this dropdown. The activated dropdown

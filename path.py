@@ -38,7 +38,7 @@ class Path:
 
         points is a list of tuples of (trip_id, stop_id_start, stop_id_end)
         """
-        init_db('data')
+        # init_db('data')
         query = TransitQuery()
         shapes = []
         self.shapes = [start]
@@ -60,10 +60,5 @@ class Path:
 
 if __name__ == '__main__':
     # TODO pyta
-
+    ...
     # init_db('data', force=True)
-    q = TransitQuery()
-    p = Path()
-    test_path = [(41910034, 3981, 9392), (41910034, 4206, 3981), (0, 3981, 4206),
-                 (41910034, 4206, 3981), (0, 3981, 4206), (41910034, 4206, 3981), (0, 3981, 4206),
-                 (41910034, 4206, 3981)]

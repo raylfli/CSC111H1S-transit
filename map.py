@@ -1,9 +1,6 @@
 """
 
 To-do:
-    - Pass location to backend for path finding
-    - Get path from locations chosen (get from backend)
-    - Display path (draw lines for path)
     - Display sidebar for path info
     - Get larger zoom images
 
@@ -285,6 +282,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                                                            waypoints['time'],
                                                            waypoints['day'], main.load_graph()))
                     path.set_visible(True)
+                    buttons[GET_PATH][0].set_text(text=RESET_PATH_TEXT)
                 else:
                     reset = True
                     path.set_visible(False)

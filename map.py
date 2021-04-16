@@ -101,13 +101,6 @@ def draw_waypoints(screen: pygame.Surface, image: Image, waypoints: list,
         pygame.draw.circle(screen, pygame.Color('black'), (x, y), 4)
 
 
-def draw_waypoint(screen: pygame.Surface, image: Image,
-                  waypoint: Waypoint, orig_x: int, orig_y: int) -> None:
-    """..."""
-    x, y = image.lat_lon_to_coord(waypoint.lat, waypoint.lon, orig_x=orig_x, orig_y=orig_y)
-    pygame.draw.circle(screen, pygame.Color('black'), (x, y), 4)
-
-
 def draw_path(screen: pygame.Surface, image: Image,
               path: Path, orig_x: int, orig_y: int) -> None:
     """Draw path."""
@@ -196,12 +189,12 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     map_screen = pygame.Surface((map_bound.width, map_bound.height))
 
     x, y = 0, 0
-    down, scroll = False, False
-    reset, clicked = False, False
+    down, scroll, clicked = False, False, False
     x_diff, y_diff = 0, 0
     zoom = 0
 
     font = ("Calibri", 20)
+    sidebar_font = ("Calibri", 14)
 
     waypoints = []
 
@@ -242,7 +235,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
     settings_dd = [PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)]
 
-    routes = PygPageLabel(20, 200, 160, 250, [], font=font, background_color=(255, 255, 255))
+    routes = PygPageLabel(20, 200, 160, 250, [],
+                          font=sidebar_font, background_color=(255, 255, 255))
 
     # buttons = {ZOOM: [PygButton(x=map_bound.width - PADDING - button_width,
     #                             y=map_bound.height - PADDING - 2 * button_height,

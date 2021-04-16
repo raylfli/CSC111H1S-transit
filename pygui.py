@@ -363,6 +363,7 @@ class PygMultiLabel:
     _rect: Rect
     _visible: bool
     labels: list[PygLabel]
+    text: list[str]
     shown_text: list[str]
     not_shown_text: list[str]
     cont: bool
@@ -390,10 +391,14 @@ class PygMultiLabel:
                   padding: int = 5) -> None:
         """Set this label's text."""
         self.labels = []
+        self.text = []
         self.shown_text = []
         i = 0
         text_height = 0
-        while (i < len(text)) and \
+        for j in range(0, len(text)):
+            self.text.extend(self._get_wrap_text(text[j], font))
+
+        while (i < len(self.text)) and \
                 (self._rect.y + i * (text_height + padding) < self._rect.y + self._rect.height):
             self.shown_text.append(text[i])
             if i == 0:
@@ -419,6 +424,32 @@ class PygMultiLabel:
         else:
             self.cont = True
             self.not_shown_text = text[i:]
+
+    def _get_wrap_text(self, text: str, given_font: tuple[str, int]) -> list[str]:
+        """Render text to get dimensions."""
+        font = pygame.font.SysFont(given_font[0], given_font[1])
+        text_width, text_height = font.size(text)
+        box_width = self._rect.width
+
+        if text_width > box_width:
+            # wrap text
+            words = text.split()
+            return self._wrap_text(words, [], font, box_width)[0]
+        else:
+            return [text]
+
+    def _wrap_text(self, words: list[str], finished_text: list[str],
+                   font: pygame.font.SysFont, box_width: int) -> tuple[list[str], list[str]]:
+        """Wrap text."""
+        if words == []:
+            return (finished_text, [])
+        else:
+            i = 1
+            new_words = words[0]
+            while i < len(words) and font.size(new_words)[0] < box_width:
+                new_words += ' ' + words[i]
+                i += 1
+            return self._wrap_text(words[i:], finished_text + [new_words], font, box_width)
 
     def set_visible(self, value: bool) -> None:
         """Set visibility of PygMultiLine."""

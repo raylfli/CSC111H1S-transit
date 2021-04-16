@@ -10,7 +10,7 @@ To-do:
 """
 import pygame
 from image import Image, load_images
-from pygui import PygButton, PygDropdown
+from pygui import PygButton, PygDropdown, PygLabel
 from waypoint import Waypoint
 from path import Path
 from typing import Union
@@ -214,6 +214,8 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     path._routes = {62667: {}}
     path.shapes = [(43.760348, -79.410691), (43.759892, -79.410757), (43.743248, -79.405991)]
 
+    label = PygLabel(200, 200, 100, 50, 'Lorem Ipsum', background_color=(255, 255, 255))
+
     # Start the event loop
     while True:
         # Display
@@ -222,6 +224,9 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         if show_path:
             draw_path(screen, images[zoom], path, x, y)
         draw_buttons(screen, buttons, width, height)
+
+        label.draw(screen)
+
         pygame.display.flip()
 
         # ---------------------------------------------------------------

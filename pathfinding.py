@@ -227,8 +227,9 @@ if __name__ == '__main__':
 
     import python_ta
     python_ta.check_all(config={
-        'extra-imports': ['collections', 'queue', 'math', 'graph', 'data_interface', 'util'],
+        'extra-imports': ['collections', 'math', 'multiprocessing', 'queue', 'typing',
+                          'data_interface', 'graph', 'util'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']
-    })
+        'disable': ['E1136']}
+    )

@@ -1,5 +1,5 @@
 """Pygame UI classes"""
-from typing import Union, Optional
+from typing import Union, Optional, Callable
 import pygame
 
 
@@ -41,25 +41,38 @@ class PygButton(Button):
     _text: Optional[str]
     _font: Optional[pygame.font.Font]
     _txt_col: Optional[tuple[int, int, int]]
+    _txt_align: int
     _txt_surface: Optional[pygame.Surface]
     _visible: bool
+    _adjust: tuple[int, int]
+    _draw_func: Callable
 
     def __init__(self, x, y, width, height, text: str = None,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  txt_col: tuple[int, int, int] = (0, 0, 0),
+                 txt_align: int = 0,
                  visible: bool = True, color: tuple[int, int, int] = (255, 255, 255),
-                 image: str = None, image_mode: int = 0):
+                 image: str = None, image_mode: int = 0,
+                 x_adjust: int = 0, y_adjust: int = 0,
+                 draw_func: Callable = None):
         """Initialize a button. Customizable background colour, image.
         Image modes:
             - 0 if you wish for the image to be resized to the button's size (default)
             - 1 if you wish to display the image at native resolution. The image will be anchored
                 at its top left corner, and any overflow will be clipped.
+
+        Text align:
+            - 0 for left align, bottom align
+            - 1 for center align, middle align
+            - 2 for right align, bottom align # TODO
         """
         self._rect = Rect(x, y, width, height)
         self._visible = visible
         self._image_mode = image_mode
         self._bg_color = pygame.Color(color)
-        self.set_text(text, font, txt_col)
+        self._set_text(text, font, txt_col, txt_align)
+        self._adjust = (x_adjust, y_adjust)
+        self._draw_func = draw_func
 
         if image is not None:
             self._image = pygame.image.load(image)
@@ -69,15 +82,16 @@ class PygButton(Button):
         else:
             self._image = None
 
-    def set_text(self, text: str = None,
+    def _set_text(self, text: str = None,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
-                 txt_col: tuple[int, int, int] = (0, 0, 0)) -> None:
+                 txt_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
         """..."""
         if text is not None:
             self._text = text
             self._txt_col = txt_col
             self._font = pygame.font.SysFont(font[0], font[1])
             self._txt_surface = self._font.render(text, True, txt_col)
+            self._txt_align = txt_align
         else:
             self._text = None
             self._font = None
@@ -91,23 +105,33 @@ class PygButton(Button):
                              (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
 
             if self._text is not None:
-                height = self._txt_surface.get_size()[1]
-                surface.blit(self._txt_surface, (self._rect.x,
-                                                 max(self._rect.y,
-                                                     self._rect.y + self._rect.height - height)),
-                             pygame.Rect(0, max(0, height - self._rect.height),
-                                         self._rect.width, self._rect.height))
+                width, height = self._txt_surface.get_size()
+                if self._txt_align == 0:
+                    surface.blit(self._txt_surface, (self._rect.x + self._rect.width / 15,
+                                                     max(self._rect.y,
+                                                         self._rect.y + self._rect.height - height)),
+                                 pygame.Rect(0, max(0, height - self._rect.height),
+                                             self._rect.width, self._rect.height))
+                elif self._txt_align == 1:
+                    surface.blit(self._txt_surface, (max(self._rect.x, (self._rect.width - width) / 2 + self._rect.x),
+                                                     max(self._rect.y,
+                                                         self._rect.y + (self._rect.height - height) / 2)),
+                                 pygame.Rect(max(0, (width - self._rect.width) / 2), max(0, (height - self._rect.height) / 2),
+                                             self._rect.width, self._rect.height))
 
             if self._image is not None:
                 if self._image_mode == 1:
                     surface.blit(self._image, (self._rect.x, self._rect.y),
                                  pygame.Rect(0, 0, self._rect.width, self._rect.height))
 
+            if self._draw_func is not None:
+                self._draw_func(surface, self._rect.x, self._rect.y, self._rect.width, self._rect.height)
+
     def on_click(self, event: pygame.event.Event) -> bool:
         """Return true if the event clicked this button."""
         if event.type == pygame.MOUSEBUTTONDOWN:
             x, y = pygame.mouse.get_pos()
-            return self._rect.contains(x, y)
+            return self._rect.contains(x + self._adjust[0], y + self._adjust[1])
         return False
 
     def set_visible(self, value: bool) -> None:
@@ -163,30 +187,21 @@ class PygDropdown(Button):
 
     def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
         """Draw this menu."""
-        if self._active:
-            # draw field
-            pygame.draw.rect(surface, self._field_col,
-                             (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
-            height = self._option_surfs[self.selected].get_size()[1]
-            surface.blit(self._option_surfs[self.selected], (self._rect.x,
-                                                             max(self._rect.y, self._rect.y +
-                                                                 self._rect.height - height)),
-                         pygame.Rect(0, max(0, height - self._rect.height),
-                                     self._rect.width, self._rect.height))
+        # draw field
+        pygame.draw.rect(surface, self._field_col,
+                         (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
+        height = self._option_surfs[self.selected].get_size()[1]
+        surface.blit(self._option_surfs[self.selected], (self._rect.x + self._rect.width / 15,
+                                                         max(self._rect.y, self._rect.y +
+                                                             self._rect.height - height)),
+                     pygame.Rect(0, max(0, height - self._rect.height),
+                                 self._rect.width, self._rect.height))
 
+        if self._active:
             # draw dropdowns
             for option in self._option_nums:
                 if self._option_nums[option] != self.selected:
                     self._draw_option(self._option_nums[option], option, surface)
-        else:
-            pygame.draw.rect(surface, self._field_col,
-                             (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
-            height = self._option_surfs[self.selected].get_size()[1]
-            surface.blit(self._option_surfs[self.selected], (self._rect.x,
-                                                             max(self._rect.y, self._rect.y +
-                                                                 self._rect.height - height)),
-                         pygame.Rect(0, max(0, height - self._rect.height),
-                                     self._rect.width, self._rect.height))
 
     def _draw_option(self, option: str, option_num: int,
                      surface: Union[pygame.Surface, pygame.SurfaceType]):
@@ -195,7 +210,7 @@ class PygDropdown(Button):
         pygame.draw.rect(surface, self._dropdown_col,
                          (self._rect.x, y, self._rect.width, self._rect.height))
         height = self._option_surfs[option].get_size()[1]
-        surface.blit(self._option_surfs[option], (self._rect.x,
+        surface.blit(self._option_surfs[option], (self._rect.x + self._rect.width / 15,
                                                   max(y, y + self._rect.height - height)),
                      pygame.Rect(0, max(0, height - self._rect.height),
                                  self._rect.width, self._rect.height))
@@ -222,7 +237,7 @@ class PygDropdown(Button):
                         self._option_nums[option_num] = option
                         option_num += 1
                 self._active = True
-            else:  # is active
+            elif self._active:  # is active
                 if self._stack_rect.contains(x, y):
                     num = (y - self._rect.y) // self._rect.height
                     if num > 0:
@@ -235,24 +250,31 @@ class PygDropdown(Button):
 
 class PygLabel:
     """Text label. Does NOT support multiline labels.
+
+    Text align:
+            - 0 for left align, bottom align
+            - 1 for center align, middle align
+            - 2 for right align, bottom align # TODO
     """
     _rect: Rect
     _font: pygame.font.Font
-    _text: str
+    text: str
     _text_col: tuple[int, int, int]
     _bg_col: Optional[pygame.Color]
     _text_surface: Optional[pygame.Surface]
+    _txt_align: int
 
     def __init__(self, x: int, y: int, width: int, height: int,
                  text: str,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  text_color: tuple[int, int, int] = (0, 0, 0),
-                 background_color: Optional[tuple[int, int, int]] = None) -> None:
+                 background_color: Optional[tuple[int, int, int]] = None,
+                 txt_align: int = 0) -> None:
         """Initialize PygLabel.
         """
         self._rect = Rect(x, y, width, height)
         self._font = pygame.font.SysFont(font[0], font[1])
-        self.set_text(text, font, text_color)
+        self._set_text(text, font, text_color, txt_align)
 
         if background_color is not None:
             self._bg_col = pygame.Color(background_color)
@@ -272,17 +294,33 @@ class PygLabel:
 
         # draw text
         width, height = self._text_surface.get_size()
-        surface.blit(self._text_surface,
-                     pygame.Rect(self._rect.x + self._rect.width / 2 - width / 2,
-                                 self._rect.y + self._rect.height / 2 - height / 2,
-                                 self._rect.width,
-                                 self._rect.height))
+        if self._txt_align == 0:
+            surface.blit(self._text_surface, (self._rect.x + self._rect.width / 15,
+                                             max(self._rect.y,
+                                                 self._rect.y + self._rect.height - height)),
+                         pygame.Rect(0, max(0, height - self._rect.height),
+                                     self._rect.width, self._rect.height))
+        elif self._txt_align == 1:
+            surface.blit(self._text_surface,
+                         (max(self._rect.x, (self._rect.width - width) / 2 + self._rect.x),
+                          max(self._rect.y,
+                              self._rect.y + (self._rect.height - height) / 2)),
+                         pygame.Rect(max(0, (width - self._rect.width) / 2),
+                                     max(0, (height - self._rect.height) / 2),
+                                     self._rect.width, self._rect.height))
 
-    def set_text(self, text: str = None,
+    def _set_text(self, text: str = None,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
-                 text_col: tuple[int, int, int] = (0, 0, 0)) -> None:
+                 text_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
         """Set this label's text."""
-        self._text = text
+        self.text = text
         self._text_col = text_col
         self._font = pygame.font.SysFont(font[0], font[1])
         self._text_surface = self._font.render(text, True, text_col)
+        self._txt_align = txt_align
+
+    def set_text(self, text: str = None):
+        """Public set text"""
+        if text is not None:
+            self.text = text
+            self._text_surface = self._font.render(text, True, self._text_col)

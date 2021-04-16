@@ -16,7 +16,8 @@ This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
 import data_interface
 from graph import Graph
-from pathfinding import find_route, a_star
+from pathfinding import find_route
+from map import run_map
 
 
 def load_graph() -> Graph():
@@ -43,11 +44,12 @@ def load_graph() -> Graph():
 
 if __name__ == '__main__':
     # download_data()
-    print(find_route((43.754885575, -79.4761333067291), (43.771236325000004, -79.43310625498007), 0, 1, load_graph()))
+    # print(find_route((43.754885575, -79.4761333067291), (43.771236325000004, -79.43310625498007), 0, 1, load_graph()))
     # g = load_graph()
     # q = data_interface.TransitQuery()
     # print(a_star(g.get_vertex(14155), g.get_vertex(9392), 62429, 7, q, g))
-
+    g = load_graph()
+    run_map(graph=g)
     # import python_ta
     # # todo modify the PyTA check
     #

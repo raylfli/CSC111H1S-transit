@@ -1,16 +1,17 @@
 """A* shenanigans"""
 from collections import defaultdict
-from queue import PriorityQueue
 from math import inf
-from typing import Union
+from multiprocessing import Pool
+from queue import PriorityQueue
+from typing import Optional, Union
 
-from graph import _Vertex, Graph
 from data_interface import TransitQuery
+from graph import _Vertex, load_graph
 from util import distance
 
 
-def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], time: int, day: int,
-               graph: Graph) -> list[tuple[int, int, int]]:
+def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], time: int,
+               day: int) -> list[tuple[int, int, int]]:
     """Given a start location, end location, and time block, compute the quickest transit route.
     Returns a list of tuples (trip_id, start stop_id, end stop_id).
     Note that the list is in reverse order of the actual route, i.e. element 0 of the returned list
@@ -21,30 +22,41 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     Day is given as integers [1, 7], where 1 is Monday and 7 is Sunday.
     """
     query = TransitQuery()
+    graph = load_graph()
 
     start_id = query.get_closest_stops(start_loc[0], start_loc[1])
     end_id = query.get_closest_stops(end_loc[0], end_loc[1])
 
-    paths = []
-    # print(f'length start_id: {len(start_id)}')
-    # print(f'length end_id: {len(end_id)}')
+    start_stop_coords = graph.get_vertex(start_id[0]).location
+    end_stop_coords = graph.get_vertex(end_id[0]).location
 
-    for id1 in start_id:
-        for id2 in end_id:
-            print((id1, id2))
-            paths.append(a_star(graph.get_vertex(id1), graph.get_vertex(id2), time, day, query, graph))
+    start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.2)
+    end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.2)
 
-    return min(paths, key=lambda x: x[1])[0]
+    # print(f'length start_id: {len(start_ids)}')
+    # print(f'length end_id: {len(end_ids)}')
+
+    with Pool(maxtasksperchild=1) as p:
+        paths = p.starmap(a_star, ((id1, id2, time, day) for id1 in start_ids for id2 in end_ids))
+
+    path = min(paths, key=lambda x: x[1])
+    print(path)
+    return path[0]
 
 
-def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQuery, graph: Graph)\
-        -> tuple[list[tuple[int, int, int]], Union[int, float]]:
+def a_star(id1: int, id2: int, time: int, day: int) \
+        -> Optional[tuple[list[tuple[int, int, int]], Union[int, float]]]:
     """A* algorithm for graph pathfinding.
 
     The inputs to this function are given as stop_ids.
 
     Returns a tuple of the path and the time the path takes, in seconds.
     """
+    query = TransitQuery()
+    graph = load_graph()
+
+    start = graph.get_vertex(id1)
+    goal = graph.get_vertex(id2)
 
     # heap of nodes to look at, sorted by f_score. The f_score of any given node n is g_score(n) +
     # h(n), i.e. the shortest path currently known to this node + estimated distance to the goal
@@ -72,23 +84,25 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
             # Use construct_path for a path with all stops included
             # Use construct_filtered_path for a path that only describe entire trip segments
             # print(f'Day arrival: {path_bin[curr.stop_id][4]}   Day departure: {day}')
-            delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + path_bin[curr.stop_id][3]
+            delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + \
+                      path_bin[curr.stop_id][3]
             return (construct_path(path_bin, curr.stop_id), delta_t)
+
+        # Note that this only works if the heuristic is both consistent and admissible. Then
+        # the arrival time to the current stop will be on the optimal path, and therefore we
+        # want to query all stops connected to this stop after this time
+        # If the time rolls over to the next day, query using the next day's timetable
+        # if day != (day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]):
+        #     print('different day')
+        # Returned as (trip_id, day, time_dep, time_arr, dist)
+        t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
+        d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
 
         # neighbour_id = set()
 
         for neighbour in curr.get_neighbours():
             # print(f'    Transiting to: {curr.stop_id} -> {neighbour.stop_id}')
             # neighbour_id.add(neighbour.stop_id)
-            # Note that this only works if the heuristic is both consistent and admissible. Then
-            # the arrival time to the current stop will be on the optimal path, and therefore we
-            # want to query all stops connected to this stop after this time
-            t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
-            # If the time rolls over to the next day, query using the next day's timetable
-            d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
-            # if day != (day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]):
-            #     print('different day')
-            # Returned as (trip_id, day, time_dep, time_arr, dist)
             edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
             if edge is not None:
                 # optimize for both distance travelled between stops and time taken to reach next stop
@@ -98,13 +112,16 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
                 else:
                     # edge_weight = edge[3] * (delta_t + 86400)
                     day_arrival = edge[1] + 1
-                edge_weight = edge[4] * (86400 - t + (((day_arrival - d) % 7) - 1) * 86400 + edge[3])
+                edge_weight = edge[4] * (
+                        86400 - t + (((day_arrival - d) % 7) - 1) * 86400 + edge[3])
                 # print(f'    Transit edge: {edge_weight}')
                 temp_gscore = g_score[curr] + edge_weight
 
                 if temp_gscore < g_score[neighbour]:
                     # record optimum path
-                    path_bin[neighbour.stop_id] = (edge[0], curr.stop_id, neighbour.stop_id, edge[3], (day_arrival - 1) % 7 + 1)
+                    path_bin[neighbour.stop_id] = (
+                        edge[0], curr.stop_id, neighbour.stop_id, edge[3],
+                        (day_arrival - 1) % 7 + 1)
                     g_score[neighbour] = temp_gscore  # update g_score for neighbour
 
                     # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
@@ -115,14 +132,14 @@ def a_star(start: _Vertex, goal: _Vertex, time: int, day: int, query: TransitQue
                     push_counter += 1
         # walking = query.get_closest_stops(curr.location[0], curr.location[1], 0.25)
         # print(f'Walking stops: {len(walking)}')
-        for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.25):
+        for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.05):
             if stop != curr.stop_id:
-            # if stop not in neighbour_id and stop != curr.stop_id and stop not in bar_revisit:
-            #     print(f'    Walking to: {curr.stop_id} -> {stop}')
+                # if stop not in neighbour_id and stop != curr.stop_id and stop not in bar_revisit:
+                #     print(f'    Walking to: {curr.stop_id} -> {stop}')
                 node = graph.get_vertex(stop)
 
-                t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
-                d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
+                # t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
+                # d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
 
                 delta_d = distance(curr.location, node.location)
                 delta_t = delta_d / 0.0014
@@ -158,8 +175,8 @@ def h(curr: _Vertex, goal: _Vertex) -> float:
     return distance(curr.location, goal.location)
 
 
-def construct_path(path_bin: dict[int, tuple[int, int, int, int, int]], goal_id: int)\
-        -> list[tuple[int, int, int]]:
+def construct_path(path_bin: dict[int, tuple[int, int, int, int, int]],
+                   goal_id: int) -> list[tuple[int, int, int]]:
     """Return a path constructed using path_bin. Note that the path returned is in reverse order:
     the first element is the final stop.
     """
@@ -174,8 +191,8 @@ def construct_path(path_bin: dict[int, tuple[int, int, int, int, int]], goal_id:
     return path
 
 
-def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]], goal_id: int)\
-        -> list[tuple[int, int, int]]:
+def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]],
+                            goal_id: int) -> list[tuple[int, int, int]]:
     """Return a path constructed using path_bin. Note that the path returned is in reverse order:
     the first element is the final stop. The stops returned in each tuple are the start and end
     of each trip.

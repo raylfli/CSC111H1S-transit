@@ -342,7 +342,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
                             pathfinding.find_route(waypoints[0].get_lat_lon(),
                                                    waypoints[1].get_lat_lon(),
                                                    time,
-                                                   DAY_TO_INT[settings_dd[0].selected], graph))
+                                                   DAY_TO_INT[settings_dd[0].selected]))
             path.set_visible(True)
         elif settings_b[1].on_click(event):
             waypoints = []

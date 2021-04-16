@@ -12,6 +12,28 @@ from typing import Any
 import data_interface
 
 
+def load_graph() -> Graph():
+    """Return a transit system graph using the processed data from data_interface.py.
+
+    The transit system graph stores one vertex for each stop in the dataset.
+    Each vertex stores as its item either a Stop ID, and the "location" _Vertex attribute stores
+    the latitude and longitude of each stop.
+
+    Edges represent a one-way connection between two existing stops.
+    """
+    g = Graph()
+    data_interface.init_db('data/')
+    q = data_interface.TransitQuery()
+    # print('load db')
+    for vertex in q.get_stops():
+        g.add_vertex(vertex[0], vertex[1])
+    # print('add vertex')
+    for edge in q.get_edges():
+        g.add_edge(edge[0], edge[1])
+    # print('add edge')
+    return g
+
+
 class _Vertex:
     """A vertex in a transit system graph, used to represent a stop.
 

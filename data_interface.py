@@ -544,6 +544,44 @@ class TransitQuery:
                 'route_color': route_info[3],
                 'route_text_color': route_info[4]}
 
+    def get_stop_info(self, stop_id: int) -> dict[str, Union[int, str, float]]:
+        """Return stop info of the given ``stop_id``.
+
+        Returned dictionary contains the following keys:
+            - stop_code: Short number that identifies the stop for riders. (This should be used
+              for publicly displayed information rather than  ``stop_id``.
+            - stop_name: Name of the stop location.
+            - stop_lat: Latitude of the stop location.
+            - stop_lon: Longitude of the stop location.
+            - wheelchair_boarding: Indicates whether wheelchair boarding is possible from this
+              stop. The GTFS static defines the following values for this column:
+                - 0 -> No accessibility information
+                - 1 -> Some vehicles can be boarded by a rider in a wheelchair
+                - 2 -> Wheelchair boarding is not possible at this stop
+
+        Raises ConnectionError if database is not connected.
+
+        Raises ValueError if no stop of the given ``stop_id`` exists.
+        """
+        if not self.open:
+            raise ConnectionError('Database is not connected.')
+
+        cur = self._con.execute("""
+        SELECT stop_code, stop_name, stop_lat, stop_lon, wheelchair_boarding
+        FROM stops
+        WHERE stop_id = ?;
+        """, (stop_id,))
+        stop_info = cur.fetchone()
+
+        if stop_info is None:
+            raise ValueError(f'Stop with id {stop_id} not found.')
+
+        return {'stop_code': stop_info[0],
+                'stop_name': stop_info[1],
+                'stop_lat': stop_info[2],
+                'stop_lon': stop_info[3],
+                'wheelchair_boarding': stop_info[4]}
+
     def get_shape_data(self, trip_id: int,
                        stop_id_start: int,
                        stop_id_end: int) -> dict[str, Union[int, list[tuple[float, float]]]]:

@@ -45,7 +45,8 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     message_queue.put(f'INFO {len(start_ids) * len(end_ids)}')
 
     with Pool(maxtasksperchild=1) as p:
-        paths = p.starmap(a_star, ((id1, id2, time, day, message_queue) for id1 in start_ids for id2 in end_ids))
+        paths = p.starmap(a_star, ((id1, id2, time, day, message_queue)
+                                   for id1 in start_ids for id2 in end_ids))
 
     path = min(paths, key=lambda x: x[1])
     message_queue.put(f'DONE {path[0]}')  # tell parent process pathfinding complete

@@ -127,7 +127,7 @@ class Path:
             if self.routes[0]['start'] not in stops:
                 stops[self.routes[0]['start']] = query.get_stop_info(self.routes[0]['start'])
             routes_text = ['1.',
-                           'Walk from starting point to stop '
+                           'Walk from origin to stop '
                            + str(stops[self.routes[0]['start']]['stop_name'])
                            + ' (' + str(stops[self.routes[0]['start']]['stop_code']) + ')',
                            '']

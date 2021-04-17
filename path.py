@@ -16,6 +16,7 @@ class Path:
     #     - _routes_info: dictionary of information for each route
     #     - _visible: bool for if the path is visible or not
     _routes_info: dict[int, dict[str, Union[dict, str]]]
+    _stops_info: dict[int, dict[str, Union[dict, str]]]
     _visible: bool
     routes: list[dict[str, Union[str, int]]]
     shapes: list[tuple[float, float]]
@@ -85,7 +86,9 @@ class Path:
             - route_color: hexadecimal route colour (string)
             - route_text_color: hexadecimal route text colour (string)
         """
+        stops = {}
         route_types = {0: 'Tram', 1: 'Subway', 3: 'Bus'}
+        query = TransitQuery()
         routes_text = ['1.',
                        'Walk from starting point to stop ' + str(self.routes[0]['start']), '']
         for i in range(0, len(self.routes)):
@@ -94,11 +97,18 @@ class Path:
             routes_text.append(self.routes[i]['route_long_name'])
             routes_text.append('Route Type: ')
             routes_text.append(route_types[self.routes[i]['route_type']])
-            routes_text.append('Stop ' + str(self.routes[i]['start']) +
-                               ' to stop ' + str(self.routes[i]['end']))
+            if self.routes[i]['start'] not in stops:
+                stops[self.routes[i]['start']] = query.get_stop_info(self.routes[i]['start'])
+            if self.routes[i]['end'] not in stops:
+                stops[self.routes[i]['end']] = query.get_stop_info(self.routes[i]['end'])
+            routes_text.append('Stop ' + str(stops[self.routes[i]['start']]['stop_name']) +
+                               ' (' + str(stops[self.routes[i]['start']]['stop_code']) + ') ' +
+                               ' to stop ' + str(stops[self.routes[i]['end']]['stop_name']) +
+                               ' (' + str(stops[self.routes[i]['end']]['stop_code']) + ') ')
             routes_text.append('')
         routes_text.extend([str(len(self.routes) + 2) + '.',
                             'Walk from stop ' + str(self.routes[-1]['end']) + ' to destination'])
+        query.close()
         return routes_text
 
 

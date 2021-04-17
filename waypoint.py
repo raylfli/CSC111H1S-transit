@@ -59,5 +59,4 @@ if __name__ == "__main__":
         'extra-imports': ['pygame', 'image'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']
-    })
+        'disable': ['E1136', 'E1121', 'R0913']})

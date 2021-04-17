@@ -677,12 +677,10 @@ if __name__ == '__main__':
 
     import python_ta
     python_ta.check_all(config={
-        'extra-imports': ['csv', 'logging', 'os', 'sqlite3', 'pathlib', 'typing', 'zipfile',
-                          'requests', 'util'],
+        'extra-imports': ['csv', 'logging', 'os', 'sqlite3', 'typing', 'util'],
         'allowed-io': ['download_data', 'init_db', '_insert_file', '_insert_stop_times_file'],
         'max-line-length': 100,
-        'disable': ['E1136']
-    })
+        'disable': ['E1136']})
 
     # logging.basicConfig(level=logging.DEBUG)
     # logging.basicConfig(level=logging.INFO)

@@ -42,13 +42,14 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.1)
     end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.1)
 
-    message_queue.put(f'INFO {len(start_ids) * len(end_ids)}')
+    message_queue.put(('INFO', len(start_ids) * len(end_ids)))
 
     with Pool(maxtasksperchild=1) as p:
-        paths = p.starmap(a_star, ((id1, id2, time, day, message_queue) for id1 in start_ids for id2 in end_ids))
+        paths = p.starmap(a_star, ((id1, id2, time, day, message_queue)
+                                   for id1 in start_ids for id2 in end_ids))
 
     path = min(paths, key=lambda x: x[1])
-    message_queue.put(f'DONE {path[0]}')  # tell parent process pathfinding complete
+    message_queue.put(('DONE', path[0]))  # tell parent process pathfinding complete
     return path[0]
 
 
@@ -61,11 +62,11 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
     Returns a tuple of the path and the time the path takes, in seconds.
     """
     logger = logging.getLogger(__name__)
-    logger.info(f"Finding path from {id1} -> {id2}")
+    logger.info("Finding path from %d -> %d" % (id1, id2))
 
     query = TransitQuery()
     graph = load_graph()
-    logger.debug(f"Graph loaded for {id1} -> {id2}")
+    logger.debug("Graph loaded for %d -> %d" % (id1, id2))
 
     start = graph.get_vertex(id1)
     goal = graph.get_vertex(id2)
@@ -92,10 +93,10 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
         if curr == goal:
             # Use construct_path for a path with all stops included
             # Use construct_filtered_path for a path that only describe entire trip segments
-            delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + \
-                      path_bin[curr.stop_id][3]
-            logger.info(f'Found path for {id1} -> {id2}')
-            message_queue.put('INC')
+            delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 \
+                + path_bin[curr.stop_id][3]
+            logger.info('Found path for %d -> %d' % (id1, id2))
+            message_queue.put(('INC',))
             return (construct_filtered_path(path_bin, curr.stop_id), delta_t)
 
         # Note that this only works if the heuristic is both consistent and admissible. Then
@@ -118,8 +119,8 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
                     day_arrival = edge[1]
                 else:
                     day_arrival = edge[1] + 1
-                edge_weight = edge[4] * (
-                        86400 - t + (((day_arrival - d) % 7) - 1) * 86400 + edge[3])
+                edge_weight = edge[4] * (86400 - t + (((day_arrival - d) % 7) - 1)
+                                         * 86400 + edge[3])
                 temp_gscore = g_score[curr] + edge_weight
 
                 if temp_gscore < g_score[neighbour]:
@@ -215,8 +216,9 @@ def construct_filtered_path(path_bin: dict[int, tuple[int, int, int, int, int]],
 
 
 if __name__ == '__main__':
-    import python_ta.contracts
-    python_ta.contracts.check_all_contracts()
+    # breaks with defaultdict
+    # import python_ta.contracts
+    # python_ta.contracts.check_all_contracts()
 
     import doctest
     doctest.testmod()
@@ -224,8 +226,8 @@ if __name__ == '__main__':
     import python_ta
     python_ta.check_all(config={
         'extra-imports': ['collections', 'math', 'multiprocessing', 'queue', 'typing',
-                          'data_interface', 'graph', 'util'],
+                          'data_interface', 'graph', 'util', 'logging'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']}
-    )
+        'max-nested-blocks': 5,
+        'disable': ['E1136', 'R0914', 'R0915']})

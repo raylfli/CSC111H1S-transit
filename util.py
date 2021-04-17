@@ -97,5 +97,4 @@ if __name__ == '__main__':
         'extra-imports': ['math'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']
-    })
+        'disable': ['E1136']})

@@ -77,9 +77,10 @@ def draw_path(screen: pygame.Surface, image: Image,
     path.draw(screen, image, orig_x, orig_y)
 
 
-def draw_progress(screen: pygame.Surface, x: int, y: int, width: int, height: int, text: str) -> None:
+def draw_progress(screen: pygame.Surface, x: int, y: int,
+                  width: int, height: int, text: str) -> None:
     """Draw progressed section for progress bar."""
-    pygame.draw.rect(screen, (180, 180, 180), (x, y, width * eval(text[:-1]) / 100, height))
+    pygame.draw.rect(screen, (180, 180, 180), (x, y, int(width * float(text[:-1]) / 100), height))
 
 
 def scroll_diff(p: int, mouse_p) -> int:
@@ -98,7 +99,7 @@ def continue_scroll(image: Image, width: int, height: int, x: int, y: int,
         return x, y
 
 
-def clamp(num, min_value: int = 0, max_value: int = 3):
+def clamp(num: int, min_value: int = 0, max_value: int = 3) -> int:
     """Return the clamped value."""
     return max(min(num, max_value), min_value)
 
@@ -147,7 +148,10 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                         width=30, height=30,
                         x_adjust=-200, draw_func=draw_zoom_out)]
 
-    progress_bar = PygLabel(int(map_bound.x + map_bound.width / 18), int(map_bound.y + map_bound.height * 17 / 18), 100, 20, '0%', ('Calibri', 12), background_color=(255, 255, 255), txt_align=1, draw_func=draw_progress, visible=False)
+    progress_bar = PygLabel(int(map_bound.x + map_bound.width / 18),
+                            int(map_bound.y + map_bound.height * 17 / 18),
+                            100, 20, '0%', ('Calibri', 12), background_color=(255, 255, 255),
+                            txt_align=1, draw_func=draw_progress, visible=False)
     total_prog = 1
     curr_prog = 0
 
@@ -157,11 +161,12 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                   PygLabel(20, 100, 70, 20, "Hours:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 125, 70, 20, "Minute:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 150, 70, 20, "Second:", font, background_color=(255, 255, 255)),
-                  PygLabel(100, 100, 30, 20, str(time_nums[0]), font, background_color=(255, 255, 255), txt_align=2),
-                  PygLabel(100, 125, 30, 20, str(time_nums[1]), font, background_color=(255, 255, 255),
-                           txt_align=2),
-                  PygLabel(100, 150, 30, 20, str(time_nums[2]), font, background_color=(255, 255, 255),
-                           txt_align=2)]
+                  PygLabel(100, 100, 30, 20, str(time_nums[0]), font,
+                           background_color=(255, 255, 255), txt_align=2),
+                  PygLabel(100, 125, 30, 20, str(time_nums[1]), font,
+                           background_color=(255, 255, 255), txt_align=2),
+                  PygLabel(100, 150, 30, 20, str(time_nums[2]), font,
+                           background_color=(255, 255, 255), txt_align=2)]
 
     settings_b = [PygButton(25, 500, 150, 20, "Get Route", font, txt_align=1),
                   PygButton(25, 540, 150, 20, "Reset", font, txt_align=1),
@@ -228,9 +233,11 @@ def run_map(filename: str = "data/image_data/images_data.csv",
 
         try:
             message = result_queue.get_nowait()
-            logger.debug(message)
-            if message.startswith('DONE'):
-                path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(), eval(message[5:]))
+            logger.debug('Child process message recv: %s' % (message, ))
+            if message[0] == 'DONE':
+                logger.info('Displaying path')
+                path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(),
+                                message[1])
                 path.set_visible(True)
                 routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
                                       font=font, background_color=(255, 255, 255), visible=True)
@@ -239,14 +246,16 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                 calculating = False
                 settings_b[0].on_click(pygame.event.Event(pygame.MOUSEBUTTONUP))
                 waypoints.append(0)
-            elif message.startswith('INFO'):
-                # setup the 0/x progress counter thingy
-                total_prog = eval(message[5:])  # total number of permutations/count max
-                pass
-            elif message.startswith('INC'):
+            elif message[0] == 'INFO':
+                # setup route find progress bar
+                total_prog = message[1]
+                logger.info('Setup progress bar with total steps %d' % total_prog)
+            elif message[0] == 'INC':
+                # increase progress bar
                 curr_prog += 1
-                progress_bar.set_text(str(round(curr_prog / total_prog * 100, 2)) + '%')
-                pass
+                progress_bar.set_text(f'{curr_prog / total_prog * 100:.2f}%')
+                logger.info('Incremented progress bar to progress %d / %d' %
+                            (curr_prog, total_prog))
         except queue.Empty:
             pass
 
@@ -261,18 +270,23 @@ def run_map(filename: str = "data/image_data/images_data.csv",
 
         if zoom_b[0].on_click(event):  # Zoom in
             if (new_zoom := clamp(zoom + 1)) != zoom:
-                x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[new_zoom].width - map_bound.width / 2), -images[new_zoom].width + map_bound.width, 0)
-                y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[new_zoom].height - map_bound.height / 2), -images[new_zoom].height + map_bound.height, 0)
+                x = clamp(int(-((map_bound.width / 2 - x) / images[zoom].width
+                                * images[new_zoom].width - map_bound.width / 2)),
+                          -images[new_zoom].width + map_bound.width, 0)
+                y = clamp(int(-((map_bound.height / 2 - y) / images[zoom].height
+                                * images[new_zoom].height - map_bound.height / 2)),
+                          -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
         elif zoom_b[1].on_click(event):  # Zoom out
             if (new_zoom := clamp(zoom - 1)) != zoom:
-                x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[
-                    new_zoom].width - map_bound.width / 2), -images[new_zoom].width + map_bound.width,
-                          0)
-                y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[
-                    new_zoom].height - map_bound.height / 2), -images[new_zoom].height + map_bound.height, 0)
+                x = clamp(int(-((map_bound.width / 2 - x) / images[zoom].width
+                                * images[new_zoom].width - map_bound.width / 2)),
+                          -images[new_zoom].width + map_bound.width, 0)
+                y = clamp(int(-((map_bound.height / 2 - y) / images[zoom].height
+                                * images[new_zoom].height - map_bound.height / 2)),
+                          -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
@@ -282,11 +296,12 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                 time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
                     settings_l[6].text)
 
-                route_find_process = Process(target=pathfinding.find_route, args=(waypoints[0].get_lat_lon(),
-                                                                                  waypoints[1].get_lat_lon(),
-                                                                                  time,
-                                                                                  DAY_TO_INT[settings_dd.selected],
-                                                                                  result_queue))
+                route_find_process = Process(target=pathfinding.find_route,
+                                             args=(waypoints[0].get_lat_lon(),
+                                                   waypoints[1].get_lat_lon(),
+                                                   time,
+                                                   DAY_TO_INT[settings_dd.selected],
+                                                   result_queue))
 
                 progress_bar.set_visible(True)
                 calculating = True
@@ -322,11 +337,12 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         mouse_x, mouse_y = pygame.mouse.get_pos()
 
         # Scroll and point logic
-        if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (
-        True, False, False):
+        if event.type == pygame.MOUSEBUTTONDOWN and \
+                pygame.mouse.get_pressed(3) == (True, False, False):
 
             if map_bound.contains(mouse_x, mouse_y) and not clicked:
-                x_diff, y_diff = scroll_diff(x, mouse_x - map_bound.x), scroll_diff(y, mouse_y - map_bound.y)
+                x_diff = scroll_diff(x, mouse_x - map_bound.x)
+                y_diff = scroll_diff(y, mouse_y - map_bound.y)
                 down = True
 
         if event.type == pygame.MOUSEBUTTONUP:
@@ -348,8 +364,8 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                 mouse_x -= map_bound.x
                 mouse_y -= map_bound.y
                 scroll = True
-                new_x, new_y = continue_scroll(images[zoom], map_bound.width, map_bound.height, x, y,
-                                               mouse_x, mouse_y, x_diff, y_diff)
+                new_x, new_y = continue_scroll(images[zoom], map_bound.width, map_bound.height,
+                                               x, y, mouse_x, mouse_y, x_diff, y_diff)
                 if new_x == x:
                     x_diff = scroll_diff(x, mouse_x)
                 else:
@@ -358,3 +374,20 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                     y_diff = scroll_diff(y, mouse_y)
                 else:
                     y = new_y
+
+
+if __name__ == "__main__":
+    import python_ta.contracts
+    python_ta.contracts.check_all_contracts()
+
+    import doctest
+    doctest.testmod()
+
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['pygame', 'pathfinding', 'image', 'pygui', 'waypoint', 'path', 'graph',
+                          'logging', 'queue', 'multiprocessing'],
+        'allowed-io': [],
+        'max-line-length': 100,
+        'max-nested-blocks': 4,
+        'disable': ['E1136', 'R0913', 'R0914', 'R0912', 'R0914', 'R0915', 'E1101']})

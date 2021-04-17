@@ -2,9 +2,6 @@
 
 This module provides the functions and classes for interacting with the TTC GTFS static data.
 
-If the TTC GTFS static data files are not present in some data directory, ``download_data`` should
-be called to download and extract the data.
-
 Then, ``init_db`` should be called to initialize the ``transit.db`` SQLite database file and
 create the required tables. ``init_db`` also has a ``force`` parameter, allowing the database file
 to be forcefully remade by dropping pre-existing tables and recreating them.

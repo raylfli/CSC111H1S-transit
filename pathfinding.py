@@ -1,4 +1,12 @@
-"""A* shenanigans"""
+"""TTC Route Planner for Toronto, Ontario -- Pathfinding
+
+This module provides the functions for computing an optimal path through TTC transit using the
+A* pathfinding algorithm. The returned path can either include every stop on the route, or only
+the start and end stops of distinct routes.
+
+This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
+"""
+
 from collections import defaultdict
 from math import inf
 from multiprocessing import Pool
@@ -33,9 +41,6 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
 
     start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.1)
     end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.1)
-
-    # print(f'length start_id: {len(start_ids)}')
-    # print(f'length end_id: {len(end_ids)}')
 
     message_queue.put(f'INFO {len(start_ids) * len(end_ids)}')
 
@@ -107,7 +112,8 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
             neighbour_id.add(neighbour.stop_id)
             edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
             if edge is not None:
-                # optimize for both distance travelled between stops and time taken to reach next stop
+                # optimize for both distance travelled between stops and time taken to reach
+                # next stop
                 if edge[3] - edge[2] >= 0:
                     day_arrival = edge[1]
                 else:
@@ -123,9 +129,9 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
                         (day_arrival - 1) % 7 + 1)
                     g_score[neighbour] = temp_gscore  # update g_score for neighbour
 
-                    # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
-                    # node removed from open_set is guaranteed to be optimal. Then by extension we know
-                    # we are not pushing any "bad" nodes.
+                    # Calculate f_score for neighbour and push onto open_set. If h is consistent,
+                    # any node removed from open_set is guaranteed to be optimal. Then by extension
+                    # we know we are not pushing any "bad" nodes.
                     f_score = g_score[neighbour] + h(neighbour, goal)
                     open_set.put((f_score, push_counter, neighbour))
                     push_counter += 1
@@ -146,9 +152,9 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
                     path_bin[stop] = (0, curr.stop_id, stop, (t + delta_t) % 86400, (d - 1) % 7 + 1)
                     g_score[node] = temp_gscore  # update g_score for neighbour
 
-                    # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
-                    # node removed from open_set is guaranteed to be optimal. Then by extension we know
-                    # we are not pushing any "bad" nodes.
+                    # Calculate f_score for neighbour and push onto open_set. If h is consistent,
+                    # any node removed from open_set is guaranteed to be optimal. Then by extension
+                    # we know we are not pushing any "bad" nodes.
                     f_score = g_score[node] + h(node, goal)
                     open_set.put((f_score, push_counter, node))
                     push_counter += 1

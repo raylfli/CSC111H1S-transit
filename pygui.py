@@ -1,4 +1,9 @@
-"""Pygame UI classes"""
+"""TTC Route Planner for Toronto, Ontario -- Pygame UI classes
+
+This file contains all Pygame GUI classes
+
+This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
+"""
 from typing import Union, Optional, Callable
 import pygame
 
@@ -160,7 +165,11 @@ class PygButton:
 
 
 class PygDropdown:
-    """A dropdown menu."""
+    """A dropdown menu.
+
+    Instance Attributes:
+        - selected: string of the current selected option in the dropdown
+    """
     selected: str
 
     _rect: Rect
@@ -201,7 +210,7 @@ class PygDropdown:
             self._option_surfs[option] = self._font.render(option, True, txt_col)
             self._option_nums[option_num] = option
 
-    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
         """Draw this menu."""
         # draw field
         pygame.draw.rect(surface, self._field_col,
@@ -220,8 +229,8 @@ class PygDropdown:
                     self._draw_option(self._option_nums[option], option, surface)
 
     def _draw_option(self, option: str, option_num: int,
-                     surface: Union[pygame.Surface, pygame.SurfaceType]):
-        """Draw a single option."""
+                     surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
+        """Draw a single option on the given surface."""
         y = self._rect.y + self._rect.height * option_num
         pygame.draw.rect(surface, self._dropdown_col,
                          (self._rect.x, y, self._rect.width, self._rect.height))
@@ -231,16 +240,6 @@ class PygDropdown:
                      pygame.Rect(0, max(0, height - self._rect.height),
                                  self._rect.width, self._rect.height))
 
-    # def on_click(self, event: pygame.event.Event) -> bool:
-    #     """Return true if the event clicked this button."""
-    #     if event.type == pygame.MOUSEBUTTONDOWN:
-    #         x, y = pygame.mouse.get_pos()
-    #         if self._active:
-    #             return self._rect.contains(x, y) or self._stack_rect.contains(x, y)
-    #         else:
-    #             return self._rect.contains(x, y)
-    #     return False
-
     def on_select(self, event: pygame.event.Event):
         """On select, either activates or deactivates this dropdown. The activated dropdown
         allows the selection of a new option."""
@@ -248,19 +247,21 @@ class PygDropdown:
             x, y = pygame.mouse.get_pos()
             if not self._active and self._rect.contains(x, y):
                 option_num = 1
+                # display each option for the dropdown
                 for option in self._option_surfs:
                     if option != self.selected:
                         self._option_nums[option_num] = option
                         option_num += 1
                 self._active = True
-            elif self._active:  # is active
+
+            # dropdown is active
+            elif self._active:
                 if self._stack_rect.contains(x, y):
                     num = (y - self._rect.y) // self._rect.height
                     if num > 0:
                         self.selected = self._option_nums[num]
                     self._active = False
                 else:
-                    # print('deactivate')
                     self._active = False
 
 
@@ -270,15 +271,25 @@ class PygLabel:
     Text align:
             - 0 for left align, bottom align
             - 1 for center align, middle align
-            - 2 for right align, bottom align # TODO
+            - 2 for right align, bottom align
             - 3 for left align, top align
+
+    Instance Attributes:
+        - text: string of the text to be displayed in the label
     """
+    # Private Instance Attributes:
+    #   - _rect: Rect object for the area of this label
+    #   - _font: pygame font for the text
+    #   - _text_col: tuple of int for text colour in RGB
+    #   - _bg_col: optional pygame.Color for the background colour
+    #   - _text_surface: pygame.Surface where the text is displayed
+    #   - _txt_align: int for the text alignment, described in more detail above
     _rect: Rect
     _font: pygame.font.Font
     text: str
     _text_col: tuple[int, int, int]
     _bg_col: Optional[pygame.Color]
-    _text_surface: Optional[pygame.Surface]
+    _text_surface: pygame.Surface
     _txt_align: int
 
     def __init__(self, x: int, y: int, width: int, height: int,
@@ -299,9 +310,9 @@ class PygLabel:
             self._bg_col = None
 
     def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType], padding: int = 5) -> None:
-        """Draw this label.
+        """Draw this label on the given surface.
         """
-        # draw background
+        # draw background ----------------------------------------------
         if self._bg_col is not None:
             pygame.draw.rect(surface, self._bg_col,
                              pygame.Rect(self._rect.x,
@@ -309,22 +320,25 @@ class PygLabel:
                                          self._rect.width,
                                          self._rect.height))
 
-        # draw text
+        # draw text ---------------------------------------------------
         width, height = self._text_surface.get_size()
+        # bottom left align
         if self._txt_align == 0:
             surface.blit(self._text_surface, (self._rect.x + self._rect.width / 15,
-                                             max(self._rect.y,
-                                                 self._rect.y + self._rect.height - height)),
+                                              max(self._rect.y,
+                                                  self._rect.y + self._rect.height - height)),
                          pygame.Rect(0, max(0, height - self._rect.height),
                                      self._rect.width, self._rect.height))
+        # center align
         elif self._txt_align == 1:
             surface.blit(self._text_surface,
-                         (max(self._rect.x, (self._rect.width - width) / 2 + self._rect.x),
+                         (max(self._rect.x, (self._rect.width - width) // 2 + self._rect.x),
                           max(self._rect.y,
-                              self._rect.y + (self._rect.height - height) / 2)),
-                         pygame.Rect(max(0, (width - self._rect.width) / 2),
-                                     max(0, (height - self._rect.height) / 2),
+                              self._rect.y + (self._rect.height - height) // 2)),
+                         pygame.Rect(max(0, (width - self._rect.width) // 2),
+                                     max(0, (height - self._rect.height) // 2),
                                      self._rect.width, self._rect.height))
+        # bottom right align
         elif self._txt_align == 2:
             surface.blit(self._text_surface, (
                 max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
@@ -333,6 +347,7 @@ class PygLabel:
                          pygame.Rect(max(0, width - self._rect.width),
                                      max(0, height - self._rect.height),
                                      self._rect.width, self._rect.height))
+        # top left align
         elif self._txt_align == 3:
             surface.blit(self._text_surface, (self._rect.x + padding,
                                               self._rect.y + padding))
@@ -348,18 +363,29 @@ class PygLabel:
         self._txt_align = txt_align
 
     def set_text(self, text: str = None):
-        """Public set text"""
+        """Public set text."""
         if text is not None:
             self.text = text
             self._text_surface = self._font.render(text, True, self._text_col)
 
     def get_dimensions(self) -> tuple[int, int]:
-        """Return the width and height of the PygLabel."""
+        """Return a tuple of the width and height of the PygLabel."""
         return self._text_surface.get_size()
 
 
 class PygMultiLabel:
-    """Multiline pygame label."""
+    """Multiline pygame label.
+
+    Instance Attributes:
+        - labels: list of PygLabel objects
+        - text: list of strings of all text that should be displayed
+        - shown_text: list of strings of text that fits in this PygMultiLabel object
+        - not_shown_text: list of strings of text that cannot fit
+        - cont: boolean of if there is a continuation of text that has not been shown yet
+    """
+    # Private Instance Attributes
+    #   - _rect: Rect object for the background
+    #   - _visible: boolean for if this object is visible when drawn
     _rect: Rect
     _visible: bool
     labels: list[PygLabel]
@@ -389,23 +415,34 @@ class PygMultiLabel:
                   background_color: Optional[tuple[int, int, int]] = None,
                   text_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 3,
                   padding: int = 5) -> None:
-        """Set this label's text."""
+        """Set this label's text.
+        This includes setting self.labels, self.text, self.shown_text, self.not_shown_text,
+        and self.cont.
+        """
         self.labels = []
         self.text = []
         self.shown_text = []
-        i = 0
-        text_height = 0
+
+        # Get list of wrapped text
         for j in range(0, len(text)):
             self.text.extend(self._get_wrap_text(text[j], font, padding))
 
+        # Add PygLabels for each line of text
+        i = 0
+        text_height = 0
         while (i < len(self.text)) and \
                 (self._rect.y + i * (text_height + padding) < self._rect.y + self._rect.height):
+            # Add to self.shown_text
             self.shown_text.append(self.text[i])
+
+            # First label (topmost PygLabel)
             if i == 0:
                 new_label = PygLabel(self._rect.x, self._rect.y,
                                      self._rect.width, self._rect.height, self.text[i],
                                      font, text_col, background_color, txt_align)
                 self.labels.append(new_label)
+
+            # Other labels (depends on previous PygLabel)
             else:
                 text_height = self.labels[i - 1].get_dimensions()[1]
                 new_label = PygLabel(self._rect.x,
@@ -413,8 +450,11 @@ class PygMultiLabel:
                                      self._rect.width, text_height + padding, self.text[i],
                                      font, text_col, background_color, txt_align)
                 self.labels.append(new_label)
+
+            # Increase index
             i += 1
 
+        # Determine if there's leftover text that's not shown
         if i >= len(self.text):
             self.cont = False
             self.not_shown_text = []
@@ -423,7 +463,8 @@ class PygMultiLabel:
             self.not_shown_text = self.text[i:]
 
     def _get_wrap_text(self, text: str, given_font: tuple[str, int], padding: int) -> list[str]:
-        """Render text to get dimensions."""
+        """Return a list of strings for text that can fit in the PygMultiLabel object to
+        represent wrapped text."""
         font = pygame.font.SysFont(given_font[0], given_font[1])
         text_width = font.size(text)[0]
         box_width = self._rect.width
@@ -436,8 +477,10 @@ class PygMultiLabel:
             return [text]
 
     def _wrap_text(self, words: list[str], finished_text: list[str],
-                   font: pygame.font.SysFont, box_width: int, padding: int) -> tuple[list[str], list[str]]:
-        """Wrap text."""
+                   font: pygame.font.SysFont, box_width: int, padding: int) \
+            -> tuple[list[str], list[str]]:
+        """Return a tuple of a list of strings that fit in the MultiLabel object
+        and a list of strings to not be displayed."""
         if words == []:
             return (finished_text, [])
         else:
@@ -455,7 +498,12 @@ class PygMultiLabel:
 
 
 class PygPageLabel:
-    """Pages of Multiline Labels."""
+    """Pages of Multiline Labels.
+
+    Instance Attributes:
+        - pages: list of PygMultiLabel objects
+        - buttons: Optional tuple of PygButtons to scroll between pages
+    """
     _visible: bool
     _selected: int
     pages: list[PygMultiLabel]
@@ -475,13 +523,8 @@ class PygPageLabel:
                               text_color, background_color, txt_align, visible)
         self.pages.append(label)
 
+        # Create buttons if necessary
         if label.cont:
-            # self.buttons = (PygButton(x - button_width, y + height // 2,
-            #                           button_width, button_width, font=font,
-            #                           draw_func=draw_page_left),
-            #                 PygButton(x + width, y + height // 2,
-            #                           button_width, button_width, font=font,
-            #                           draw_func=draw_page_right))
             self.buttons = (PygButton(x + width // 2 - button_width // 2, y - button_width,
                                       button_width, button_width, font=font,
                                       draw_func=draw_inc),
@@ -491,6 +534,7 @@ class PygPageLabel:
         else:
             self.buttons = None
 
+        # Create multiple pages of info
         while label.cont:
             label = PygMultiLabel(x, y, width, height, label.not_shown_text, font,
                                   text_color, background_color, txt_align, visible)
@@ -524,29 +568,32 @@ class PygPageLabel:
         self._visible = value
 
 
-# def draw_page_left(screen: pygame.Surface, x: int, y: int, width:int, height: int) -> None:
-#     """Draw page left button."""
-#     pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y), 2)
-#     pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y + height), 2)
-#
-#
-# def draw_page_right(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
-#     """Draw page right button."""
-#     pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y), (x + width, y + height / 2), 2)
-#     pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y + height),
-#                      (x + width, y + height / 2), 2)
-
-
 def draw_inc(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
-    """Draw increment arrow"""
+    """Draw increment arrow."""
     pygame.draw.line(screen, pygame.Color('black'), (x, y + height * 3 / 4), (x + width / 2, y), 2)
     pygame.draw.line(screen, pygame.Color('black'), (x + width / 2, y),
                      (x + width, y + height * 3 / 4), 2)
 
 
 def draw_dec(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
-    """Draw decrement arrow"""
+    """Draw decrement arrow."""
     pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 4),
                      (x + width / 2, y + height), 2)
     pygame.draw.line(screen, pygame.Color('black'), (x + width / 2, y + height),
                      (x + width, y + height / 4), 2)
+
+
+if __name__ == "__main__":
+    import python_ta.contracts
+    python_ta.contracts.check_all_contracts()
+
+    import doctest
+    doctest.testmod()
+
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['pygame', 'typing'],
+        'allowed-io': [],
+        'max-line-length': 100,
+        'disable': ['E1136']
+    })

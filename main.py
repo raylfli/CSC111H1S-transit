@@ -16,8 +16,8 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'HIDE'
 
 if __name__ == '__main__':
     # uncomment/comment for debug messages/info messages in console.
-    logging.basicConfig(level=logging.DEBUG)
-    # logging.basicConfig(level=logging.INFO)
+    # logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.INFO)
 
     logger = logging.getLogger(__name__)
 

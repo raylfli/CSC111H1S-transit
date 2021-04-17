@@ -30,8 +30,8 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     start_stop_coords = graph.get_vertex(start_id[0]).location
     end_stop_coords = graph.get_vertex(end_id[0]).location
 
-    start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.2)
-    end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.2)
+    start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.1)
+    end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.1)
 
     # print(f'length start_id: {len(start_ids)}')
     # print(f'length end_id: {len(end_ids)}')
@@ -98,11 +98,11 @@ def a_star(id1: int, id2: int, time: int, day: int) \
         t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
         d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
 
-        # neighbour_id = set()
+        neighbour_id = set()
 
         for neighbour in curr.get_neighbours():
             # print(f'    Transiting to: {curr.stop_id} -> {neighbour.stop_id}')
-            # neighbour_id.add(neighbour.stop_id)
+            neighbour_id.add(neighbour.stop_id)
             edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
             if edge is not None:
                 # optimize for both distance travelled between stops and time taken to reach next stop
@@ -133,7 +133,7 @@ def a_star(id1: int, id2: int, time: int, day: int) \
         # walking = query.get_closest_stops(curr.location[0], curr.location[1], 0.25)
         # print(f'Walking stops: {len(walking)}')
         for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.05):
-            if stop != curr.stop_id:
+            if stop != curr.stop_id and stop not in neighbour_id:
                 # if stop not in neighbour_id and stop != curr.stop_id and stop not in bar_revisit:
                 #     print(f'    Walking to: {curr.stop_id} -> {stop}')
                 node = graph.get_vertex(stop)

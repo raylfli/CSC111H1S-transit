@@ -108,10 +108,8 @@ class Path:
                        'Walk from starting point to stop ' + str(self.routes[0]['start']), '']
         for i in range(0, len(self.routes)):
             routes_text.append(str(i + 2) + '.')
-            routes_text.append('Route Name: ')
-            routes_text.append(self.routes[i]['route_long_name'])
-            routes_text.append('Route Type: ')
-            routes_text.append(route_types[self.routes[i]['route_type']])
+            routes_text.append('Route Name: ' + self.routes[i]['route_long_name'])
+            routes_text.append('Route Type: ' + route_types[self.routes[i]['route_type']])
             if self.routes[i]['start'] not in stops:
                 stops[self.routes[i]['start']] = query.get_stop_info(self.routes[i]['start'])
             if self.routes[i]['end'] not in stops:

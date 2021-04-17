@@ -192,7 +192,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
     settings_l = [PygLabel(20, 50, 50, 20, "Day:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 100, 70, 20, "Hours:", font, background_color=(255, 255, 255)),
-                  PygLabel(20, 125, 40, 20, "Minute:", font, background_color=(255, 255, 255)),
+                  PygLabel(20, 125, 70, 20, "Minute:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 150, 70, 20, "Second:", font, background_color=(255, 255, 255)),
                   PygLabel(100, 100, 30, 20, str(time_nums[0]), font, background_color=(255, 255, 255), txt_align=2),
                   PygLabel(100, 125, 30, 20, str(time_nums[1]), font, background_color=(255, 255, 255),

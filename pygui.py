@@ -464,7 +464,7 @@ class PygPageLabel:
     def __init__(self, x: int, y: int, width: int, height: int,
                  text: list[str], font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  text_color: tuple[int, int, int] = (0, 0, 0),
-                 background_color: Optional[list[tuple[int, int, int]]] = None,
+                 background_color: Optional[tuple[int, int, int]] = None,
                  txt_align: int = 3, visible: bool = False,
                  button_width: int = 9) -> None:
         """Initialize a PygPageLabel object."""

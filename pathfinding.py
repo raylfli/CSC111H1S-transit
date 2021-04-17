@@ -4,6 +4,7 @@ from math import inf
 from multiprocessing import Pool
 from queue import PriorityQueue
 from typing import Optional, Union
+import logging
 
 from data_interface import TransitQuery
 from graph import _Vertex, load_graph
@@ -33,9 +34,6 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.1)
     end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.1)
 
-    # print(f'length start_id: {len(start_ids)}')
-    # print(f'length end_id: {len(end_ids)}')
-
     with Pool(maxtasksperchild=1) as p:
         paths = p.starmap(a_star, ((id1, id2, time, day) for id1 in start_ids for id2 in end_ids))
 
@@ -52,8 +50,12 @@ def a_star(id1: int, id2: int, time: int, day: int) \
 
     Returns a tuple of the path and the time the path takes, in seconds.
     """
+    logger = logging.getLogger(__name__)
+    logger.info(f"Finding path from {id1} -> {id2}")
+
     query = TransitQuery()
     graph = load_graph()
+    logger.debug(f"Graph loaded for {id1} -> {id2}")
 
     start = graph.get_vertex(id1)
     goal = graph.get_vertex(id2)
@@ -73,27 +75,22 @@ def a_star(id1: int, id2: int, time: int, day: int) \
     g_score = defaultdict(lambda: inf)
     g_score[start] = 0
 
-    # bar_revisit = set()
     push_counter = 0
     while not open_set.empty():
         curr = open_set.get()[2]
-        # print(f'Open node: {curr.stop_id}')
-        # bar_revisit.add(curr.stop_id)
 
         if curr == goal:
             # Use construct_path for a path with all stops included
             # Use construct_filtered_path for a path that only describe entire trip segments
-            # print(f'Day arrival: {path_bin[curr.stop_id][4]}   Day departure: {day}')
             delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + \
                       path_bin[curr.stop_id][3]
+            logger.info(f'Found path for {id1} -> {id2}')
             return (construct_filtered_path(path_bin, curr.stop_id), delta_t)
 
         # Note that this only works if the heuristic is both consistent and admissible. Then
         # the arrival time to the current stop will be on the optimal path, and therefore we
         # want to query all stops connected to this stop after this time
         # If the time rolls over to the next day, query using the next day's timetable
-        # if day != (day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]):
-        #     print('different day')
         # Returned as (trip_id, day, time_dep, time_arr, dist)
         t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
         d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
@@ -101,20 +98,16 @@ def a_star(id1: int, id2: int, time: int, day: int) \
         neighbour_id = set()
 
         for neighbour in curr.get_neighbours():
-            # print(f'    Transiting to: {curr.stop_id} -> {neighbour.stop_id}')
             neighbour_id.add(neighbour.stop_id)
             edge = query.get_edge_data(curr.stop_id, neighbour.stop_id, t, d)
             if edge is not None:
                 # optimize for both distance travelled between stops and time taken to reach next stop
                 if edge[3] - edge[2] >= 0:
-                    # edge_weight = edge[3] * delta_t
                     day_arrival = edge[1]
                 else:
-                    # edge_weight = edge[3] * (delta_t + 86400)
                     day_arrival = edge[1] + 1
                 edge_weight = edge[4] * (
                         86400 - t + (((day_arrival - d) % 7) - 1) * 86400 + edge[3])
-                # print(f'    Transit edge: {edge_weight}')
                 temp_gscore = g_score[curr] + edge_weight
 
                 if temp_gscore < g_score[neighbour]:
@@ -130,21 +123,14 @@ def a_star(id1: int, id2: int, time: int, day: int) \
                     f_score = g_score[neighbour] + h(neighbour, goal)
                     open_set.put((f_score, push_counter, neighbour))
                     push_counter += 1
-        # walking = query.get_closest_stops(curr.location[0], curr.location[1], 0.25)
-        # print(f'Walking stops: {len(walking)}')
+
         for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.05):
             if stop != curr.stop_id and stop not in neighbour_id:
-                # if stop not in neighbour_id and stop != curr.stop_id and stop not in bar_revisit:
-                #     print(f'    Walking to: {curr.stop_id} -> {stop}')
                 node = graph.get_vertex(stop)
-
-                # t = time if curr.stop_id not in path_bin else path_bin[curr.stop_id][3]
-                # d = day if curr.stop_id not in path_bin else path_bin[curr.stop_id][4]
 
                 delta_d = distance(curr.location, node.location)
                 delta_t = delta_d / 0.0014
                 edge_weight = delta_d * delta_t
-                # print(f'    Walking edge: {edge_weight}')
                 temp_gscore = g_score[curr] + edge_weight
 
                 if temp_gscore < g_score[node]:
@@ -160,9 +146,7 @@ def a_star(id1: int, id2: int, time: int, day: int) \
                     f_score = g_score[node] + h(node, goal)
                     open_set.put((f_score, push_counter, node))
                     push_counter += 1
-        # print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')
-        # if curr.stop_id == 7723:
-        #     print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')
+
     return ([(0, 0, 0)], inf)
 
 
@@ -186,7 +170,6 @@ def construct_path(path_bin: dict[int, tuple[int, int, int, int, int]],
     while curr_id in path_bin.keys():
         path.append(path_bin[curr_id][:3])
         curr_id = path_bin[curr_id][1]
-        # print(f'Path: {path}')
 
     return path
 

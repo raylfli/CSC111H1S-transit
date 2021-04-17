@@ -14,6 +14,8 @@ Running the main block of this module will:
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'HIDE'
 from map import run_map
 
 

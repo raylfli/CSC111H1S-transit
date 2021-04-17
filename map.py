@@ -8,8 +8,9 @@ from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel, draw_inc
 from waypoint import Waypoint
 from path import Path
 from typing import Union
-from multiprocessing import Process, Queue, Manager
+from multiprocessing import Process, Manager
 import queue
+import logging
 
 ALLOWED = [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
            pygame.MOUSEMOTION, pygame.KEYDOWN]
@@ -66,14 +67,19 @@ def draw_zoom_out(screen: pygame.Surface, x: int, y: int, width: int, height: in
 def draw_waypoints(screen: pygame.Surface, image: Image, waypoints: list,
                    orig_x: int, orig_y: int) -> None:
     """dkm this isn't acc drawing waypoints"""
-    for waypoint in waypoints:
-        waypoint.draw(screen, image, orig_x, orig_y)
+    for i in range(min(len(waypoints), 2)):
+        waypoints[i].draw(screen, image, orig_x, orig_y)
 
 
 def draw_path(screen: pygame.Surface, image: Image,
               path: Path, orig_x: int, orig_y: int) -> None:
     """Draw path."""
     path.draw(screen, image, orig_x, orig_y)
+
+
+def draw_progress(screen: pygame.Surface, x: int, y: int, width: int, height: int, text: str) -> None:
+    """Draw progressed section for progress bar."""
+    pygame.draw.rect(screen, (180, 180, 180), (x, y, width * eval(text[:-1]) / 100, height))
 
 
 def scroll_diff(p: int, mouse_p) -> int:
@@ -123,7 +129,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     map_screen = pygame.Surface((map_bound.width, map_bound.height))
 
     x, y = 0, 0
-    down, scroll, clicked = False, False, False
+    down, scroll, clicked, calculating = False, False, False, False
     x_diff, y_diff = 0, 0
     zoom = 0
 
@@ -140,6 +146,10 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                         y=map_bound.height - 80,
                         width=30, height=30,
                         x_adjust=-200, draw_func=draw_zoom_out)]
+
+    progress_bar = PygLabel(int(map_bound.x + map_bound.width / 18), int(map_bound.y + map_bound.height * 17 / 18), 100, 20, '0%', ('Calibri', 12), background_color=(255, 255, 255), txt_align=1, draw_func=draw_progress, visible=False)
+    total_prog = 1
+    curr_prog = 0
 
     time_nums = [0, 0, 0]
 
@@ -167,7 +177,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                   PygButton(135, 161, 9, 9,
                             draw_func=draw_dec)]  # second dec
 
-    settings_dd = [PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)]
+    settings_dd = PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)
 
     routes = PygPageLabel(20, 200, 160, 250, [],
                           font=sidebar_font, background_color=(255, 255, 255))
@@ -182,6 +192,9 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     # Start the event loop
     manager = Manager()
     result_queue = manager.Queue()
+
+    logger = logging.getLogger(__name__)
+
     while True:
         # Draw map area
         draw_map(map_screen, tile, x, y)
@@ -193,6 +206,8 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         # blit map onto screen
         screen.blit(map_screen, (map_bound.x, map_bound.y))
 
+        progress_bar.draw(screen)
+
         # Draw settings bar area
         pygame.draw.rect(screen, (0, 100, 0), (0, 0, 200, 600))
         for button in settings_b:
@@ -201,8 +216,7 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         for label in settings_l:
             label.draw(screen)
 
-        for dropdown in settings_dd:
-            dropdown.draw(screen)
+        settings_dd.draw(screen)
 
         routes.draw(screen)
 
@@ -214,18 +228,24 @@ def run_map(filename: str = "data/image_data/images_data.csv",
 
         try:
             message = result_queue.get_nowait()
-            print(message)
+            logger.debug(message)
             if message.startswith('DONE'):
                 path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(), eval(message[5:]))
                 path.set_visible(True)
                 routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
                                       font=font, background_color=(255, 255, 255), visible=True)
+                progress_bar.set_visible(False)
+                curr_prog = 0
+                calculating = False
+                settings_b[0].on_click(pygame.event.Event(pygame.MOUSEBUTTONUP))
+                waypoints.append(0)
             elif message.startswith('INFO'):
                 # setup the 0/x progress counter thingy
-                num = eval(message[5:])  # total number of permutations/count max
+                total_prog = eval(message[5:])  # total number of permutations/count max
                 pass
             elif message.startswith('INC'):
-                # increment counter thingy
+                curr_prog += 1
+                progress_bar.set_text(str(round(curr_prog / total_prog * 100, 2)) + '%')
                 pass
         except queue.Empty:
             pass
@@ -256,57 +276,48 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
-        elif settings_b[0].on_click(event) and len(waypoints) == 2:
-            time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
-                settings_l[6].text)
 
-            route_find_process = Process(target=pathfinding.find_route, args=(waypoints[0].get_lat_lon(),
-                                                                              waypoints[1].get_lat_lon(),
-                                                                              time,
-                                                                              DAY_TO_INT[settings_dd[0].selected],
-                                                                              result_queue))
+        if not calculating:
+            if settings_b[0].on_click(event) and len(waypoints) == 2:  # Get Routes
+                time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
+                    settings_l[6].text)
 
-            route_find_process.start()
-            # elif not route_find_process.is_alive():
-            #     print('here!')
-            #     path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon())
+                route_find_process = Process(target=pathfinding.find_route, args=(waypoints[0].get_lat_lon(),
+                                                                                  waypoints[1].get_lat_lon(),
+                                                                                  time,
+                                                                                  DAY_TO_INT[settings_dd.selected],
+                                                                                  result_queue))
 
-            # path.get_shapes(waypoints[0].get_lat_lon(),
-            #                 waypoints[1].get_lat_lon(),
-            #                 pathfinding.find_route(waypoints[0].get_lat_lon(),
-            #                                        waypoints[1].get_lat_lon(),
-            #                                        time,
-            #                                        DAY_TO_INT[settings_dd[0].selected]))
-            # path.set_visible(True)
-            # routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
-            #                       font=font, background_color=(255, 255, 255), visible=True)
-        elif settings_b[1].on_click(event):
-            waypoints = []
-            path.set_visible(False)
-            routes.set_visible(False)
-        elif settings_b[2].on_click(event):  # hour inc
-            time_nums[0] = (time_nums[0] + 1) % 24
-            settings_l[4].set_text(str(time_nums[0]))  # refresh time label
-        elif settings_b[3].on_click(event):  # hour dec
-            time_nums[0] = (time_nums[0] - 1) % 24
-            settings_l[4].set_text(str(time_nums[0]))  # refresh time label
-        elif settings_b[4].on_click(event):  # minute inc
-            time_nums[1] = (time_nums[1] + 1) % 60
-            settings_l[5].set_text(str(time_nums[1]))  # refresh time label
-        elif settings_b[5].on_click(event):  # minute dec
-            time_nums[1] = (time_nums[1] - 1) % 60
-            settings_l[5].set_text(str(time_nums[1]))  # refresh time label
-        elif settings_b[6].on_click(event):  # second inc
-            time_nums[2] = (time_nums[2] + 1) % 60
-            settings_l[6].set_text(str(time_nums[2]))  # refresh time label
-        elif settings_b[7].on_click(event):  # second dec
-            time_nums[2] = (time_nums[2] - 1) % 60
-            settings_l[6].set_text(str(time_nums[2]))  # refresh time label
-        elif routes.on_click(event):
-            routes.on_select(event)
+                progress_bar.set_visible(True)
+                calculating = True
+                route_find_process.start()
 
-        for dropdown in settings_dd:
-            dropdown.on_select(event)
+            elif settings_b[1].on_click(event):  # Reset
+                waypoints = []
+                path.set_visible(False)
+                routes.set_visible(False)
+            elif settings_b[2].on_click(event):  # hour inc
+                time_nums[0] = (time_nums[0] + 1) % 24
+                settings_l[4].set_text(str(time_nums[0]))  # refresh time label
+            elif settings_b[3].on_click(event):  # hour dec
+                time_nums[0] = (time_nums[0] - 1) % 24
+                settings_l[4].set_text(str(time_nums[0]))  # refresh time label
+            elif settings_b[4].on_click(event):  # minute inc
+                time_nums[1] = (time_nums[1] + 1) % 60
+                settings_l[5].set_text(str(time_nums[1]))  # refresh time label
+            elif settings_b[5].on_click(event):  # minute dec
+                time_nums[1] = (time_nums[1] - 1) % 60
+                settings_l[5].set_text(str(time_nums[1]))  # refresh time label
+            elif settings_b[6].on_click(event):  # second inc
+                time_nums[2] = (time_nums[2] + 1) % 60
+                settings_l[6].set_text(str(time_nums[2]))  # refresh time label
+            elif settings_b[7].on_click(event):  # second dec
+                time_nums[2] = (time_nums[2] - 1) % 60
+                settings_l[6].set_text(str(time_nums[2]))  # refresh time label
+            elif routes.on_click(event):
+                routes.on_select(event)
+
+            settings_dd.on_select(event)  # Day selection
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
 

@@ -17,7 +17,12 @@ class Path:
 
     Instance Attributes:
         - shapes: list of tuples of type of path and list of coordinates relating to that type
-            in correct order
+            in correct order,
+            path types are as follows:
+                - -1 -> Walk
+                - 0 -> Tram, Streetcar, Light rail
+                - 1 -> Subway, Metro
+                - 3 -> Bus
         - routes: list of dictionary of ordered route info of the path,
             each dictionary is in the following format:
                 - start: stop ID of the starting stop of a route in this path
@@ -58,7 +63,7 @@ class Path:
                     start = image.lat_lon_to_coord(start_lat, start_lon, orig_x, orig_y)
                     end = image.lat_lon_to_coord(end_lat, end_lon, orig_x, orig_y)
                     color = '#' + self._routes_info[self.shapes[i][0]]['route_color'] \
-                        if self.shapes[i][0] != 0 else 'black'
+                        if self.shapes[i][0] != -1 else 'black'
                     pygame.draw.line(screen, pygame.Color(color), start, end, line_width)
 
     def set_visible(self, value: bool) -> None:
@@ -71,51 +76,53 @@ class Path:
         a list of stops of tuples in the format (trip_id, stop_id_start, stop_id_end)
         in reverse order of the path.
         """
-        shapes = []
-        self.shapes = [(0, [start])]
+        # Add origin
+        self.shapes = [(-1, [start])]
         self.routes = []
+        if stops != []:
+            shapes = []
 
-        # Create TransitQuery
-        query = TransitQuery()
+            # Create TransitQuery
+            query = TransitQuery()
 
-        # Add path in order (originally given in reverse)
-        for j in range(len(stops) - 1, -1, -1):
-            trip_id, stop_id_start, stop_id_end = stops[j]
-            if trip_id != 0:
-                shapes.append(query.get_shape_data(trip_id, stop_id_start, stop_id_end))
-                self.routes.append({'start': stop_id_start, 'end': stop_id_end})
+            # Add path in order (originally given in reverse)
+            for j in range(len(stops) - 1, -1, -1):
+                trip_id, stop_id_start, stop_id_end = stops[j]
+                if trip_id != 0:
+                    shapes.append(query.get_shape_data(trip_id, stop_id_start, stop_id_end))
+                    self.routes.append({'start': stop_id_start, 'end': stop_id_end})
 
-        # Set route and path information
-        for i in range(0, len(shapes)):
-            if shapes[i]['route_id'] not in self._routes_info:
-                self._routes_info[shapes[i]['route_id']] = \
-                    query.get_route_info(shapes[i]['route_id'])
+            # Set route and path information
+            for i in range(0, len(shapes)):
+                if shapes[i]['route_id'] not in self._routes_info:
+                    self._routes_info[shapes[i]['route_id']] = \
+                        query.get_route_info(shapes[i]['route_id'])
 
-            self.routes[i].update(self._routes_info[shapes[i]['route_id']])
-            if shapes[i]['route_id'] == self.shapes[-1][0]:
-                for lat_lon in shapes[i]['shape']:
-                    self.shapes[-1][1].append(lat_lon)
-            else:
-                self.shapes.append((shapes[i]['route_id'], [self.shapes[-1][1][-1]]))
-                for lat_lon in shapes[i]['shape']:
-                    self.shapes[-1][1].append(lat_lon)
+                self.routes[i].update(self._routes_info[shapes[i]['route_id']])
+                if shapes[i]['route_id'] == self.shapes[-1][0]:
+                    for lat_lon in shapes[i]['shape']:
+                        self.shapes[-1][1].append(lat_lon)
+                else:
+                    self.shapes.append((shapes[i]['route_id'], [self.shapes[-1][1][-1]]))
+                    for lat_lon in shapes[i]['shape']:
+                        self.shapes[-1][1].append(lat_lon)
 
-        if self.shapes[-1][0] != 0:
-            self.shapes.append((0, [self.shapes[-1][1][-1], end]))
+            # Close TransitQuery
+            query.close()
+
+        # Add destination
+        if self.shapes[-1][0] != -1:
+            self.shapes.append((-1, [self.shapes[-1][1][-1], end]))
         else:
             self.shapes[-1][1].append(end)
-
-        # Close TransitQuery
-        query.close()
 
     def routes_to_text(self) -> list[str]:
         """Returns a list of steps for the user to take for this path.
          Returned list to be used in PygPageLabel.
-
-         Raise IndexError if self.routes is empty.
         """
         if self.routes == []:
-            raise IndexError('Path.routes is empty, should call Path.get_shapes first')
+            return ['1.',
+                    'Walk directly from origin to destination']
         else:
             stops = {}
             route_types = {0: 'Tram', 1: 'Subway', 3: 'Bus'}

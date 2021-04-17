@@ -394,10 +394,10 @@ class PygLabel:
                                          self._rect.width, self._rect.height))
             # bottom right align
             elif self._txt_align == 2:
-                surface.blit(self._text_surface, (
-                    max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
-                    max(self._rect.y,
-                        self._rect.y + self._rect.height - height)),
+                surface.blit(self._text_surface,
+                             (max(self._rect.x, self._rect.x + self._rect.width - width)
+                              - self._rect.width / 15,
+                              max(self._rect.y, self._rect.y + self._rect.height - height)),
                              pygame.Rect(max(0, width - self._rect.width),
                                          max(0, height - self._rect.height),
                                          self._rect.width, self._rect.height))
@@ -416,7 +416,7 @@ class PygLabel:
         self._text_surface = self._font.render(text, True, text_col)
         self._txt_align = txt_align
 
-    def set_text(self, text: str = None):
+    def set_text(self, text: str = None) -> None:
         """Public set text."""
         if text is not None:
             self.text = text
@@ -612,7 +612,7 @@ class PygPageLabel:
                                   text_color, background_color, txt_align, visible)
             self.pages.append(label)
 
-    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
         """Draw pages."""
         if self._visible:
             self.pages[self._selected].draw(surface)
@@ -670,5 +670,5 @@ if __name__ == "__main__":
         'extra-imports': ['pygame', 'typing'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136', 'E1121', 'R0902']
-    })
+        'max-nested-blocks': 4,
+        'disable': ['E1136', 'E1121', 'R0902', 'E1101', 'R0913', 'R0914']})

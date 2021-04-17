@@ -128,5 +128,4 @@ if __name__ == "__main__":
         'extra-imports': ['csv'],
         'allowed-io': ['load_images'],
         'max-line-length': 100,
-        'disable': ['E1136', 'R0913', 'R0902']
-    })
+        'disable': ['E1136', 'R0913', 'R0902']})

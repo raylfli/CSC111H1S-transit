@@ -162,8 +162,6 @@ class Path:
                                 + ' (' + str(stops[self.routes[-1]['end']]['stop_code']) + ')'
                                 + ' to destination'])
 
-            # Close TransitQuery
-            query.close()
             return routes_text
 
 
@@ -179,5 +177,5 @@ if __name__ == '__main__':
         'extra-imports': ['pygame', 'data_interface', 'image', 'typing'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136', 'E1121']
-    })
+        'max-nested-blocks': 4,
+        'disable': ['E1136', 'E1121', 'R0913']})

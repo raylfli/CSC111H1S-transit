@@ -8,18 +8,12 @@ from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel, draw_inc
 from waypoint import Waypoint
 from path import Path
 from typing import Union
-
-from graph import Graph
+from multiprocessing import Process, Manager
+import queue
+import logging
 
 ALLOWED = [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
            pygame.MOUSEMOTION, pygame.KEYDOWN]
-MAX_ZOOM = 3
-PADDING = 50
-ZOOM = 'zoom'
-SETTINGS = 'settings'
-GET_PATH = 'path'
-PATH_TEXT = 'Get path'
-RESET_PATH_TEXT = 'Reset'
 DAYS_TEXT = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 DAY_TO_INT = {'Monday': 1, 'Tuesday': 2, 'Wednesday': 3, 'Thursday': 4,
               'Friday': 5, 'Saturday': 6, 'Sunday': 7}
@@ -70,36 +64,22 @@ def draw_zoom_out(screen: pygame.Surface, x: int, y: int, width: int, height: in
                      (x + width / 10, y + height / 2), (x + width - width / 10, y + height / 2), 7)
 
 
-def draw_settings(screen: pygame.Surface, settings: list[PygDropdown]) -> None:
-    """..."""
-    for setting in settings:
-        setting.draw(screen)
-
-
-def draw_check_path(screen: pygame.Surface, buttons: list[PygButton]) -> None:
-    """..."""
-    for button in buttons:
-        button.draw(screen)
-
-
-def draw_buttons(screen: pygame.Surface, buttons: dict, width: int, height: int) -> None:
-    """..."""
-    # draw_zoom(screen, buttons[ZOOM], width, height)
-    draw_settings(screen, buttons[SETTINGS])
-    draw_check_path(screen, buttons[GET_PATH])
-
-
 def draw_waypoints(screen: pygame.Surface, image: Image, waypoints: list,
                    orig_x: int, orig_y: int) -> None:
     """dkm this isn't acc drawing waypoints"""
-    for waypoint in waypoints:
-        waypoint.draw(screen, image, orig_x, orig_y)
+    for i in range(min(len(waypoints), 2)):
+        waypoints[i].draw(screen, image, orig_x, orig_y)
 
 
 def draw_path(screen: pygame.Surface, image: Image,
               path: Path, orig_x: int, orig_y: int) -> None:
     """Draw path."""
     path.draw(screen, image, orig_x, orig_y)
+
+
+def draw_progress(screen: pygame.Surface, x: int, y: int, width: int, height: int, text: str) -> None:
+    """Draw progressed section for progress bar."""
+    pygame.draw.rect(screen, (180, 180, 180), (x, y, width * eval(text[:-1]) / 100, height))
 
 
 def scroll_diff(p: int, mouse_p) -> int:
@@ -132,29 +112,8 @@ def check_points_clicked(lat: float, lon: float,
         waypoints.append(Waypoint(lat, lon, chosen_end=True))
 
 
-def time_to_sec(time: list[int]) -> int:
-    """Return the number of seconds after midnight from a given time.
-
-    Preconditions:
-        - len(time) == 3
-    """
-    hour, minute, second = time[0], time[1], time[2]
-    return hour * 3600 + minute * 60 + second
-
-
-def reset_points(button: PygButton, day_dropdown: PygDropdown, hr_dropdown: PygDropdown,
-                 min_dropdown: PygDropdown, sec_dropdown: PygDropdown) -> dict:
-    """..."""
-    # button.set_visible(False)
-    # button.set_text(text=PATH_TEXT)
-    time = [int(hr_dropdown.selected), int(min_dropdown.selected), int(sec_dropdown.selected)]
-    time_in_sec = time_to_sec(time)
-    return {'day': DAY_TO_INT[day_dropdown.selected], 'time': time_in_sec, 'pts': []}
-
-
-def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
-            width: int = 1000, height: int = 600,
-            button_width: int = 50, button_height: int = 50) -> None:
+def run_map(filename: str = "data/image_data/images_data.csv",
+            width: int = 1000, height: int = 600) -> None:
     """Run main map.
 
     Preconditions:
@@ -170,7 +129,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     map_screen = pygame.Surface((map_bound.width, map_bound.height))
 
     x, y = 0, 0
-    down, scroll, clicked = False, False, False
+    down, scroll, clicked, calculating = False, False, False, False
     x_diff, y_diff = 0, 0
     zoom = 0
 
@@ -179,14 +138,18 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
     waypoints = []
 
-    zoom_b = [PygButton(x=map_bound.width - PADDING - 30,
-                        y=map_bound.height - PADDING - 2 * 30 - 10,
+    zoom_b = [PygButton(x=map_bound.width - 80,
+                        y=map_bound.height - 120,
                         width=30, height=30,
                         x_adjust=-200, draw_func=draw_zoom_in),
-              PygButton(x=map_bound.width - PADDING - 30,
-                        y=map_bound.height - PADDING - 30,
+              PygButton(x=map_bound.width - 80,
+                        y=map_bound.height - 80,
                         width=30, height=30,
                         x_adjust=-200, draw_func=draw_zoom_out)]
+
+    progress_bar = PygLabel(int(map_bound.x + map_bound.width / 18), int(map_bound.y + map_bound.height * 17 / 18), 100, 20, '0%', ('Calibri', 12), background_color=(255, 255, 255), txt_align=1, draw_func=draw_progress, visible=False)
+    total_prog = 1
+    curr_prog = 0
 
     time_nums = [0, 0, 0]
 
@@ -214,38 +177,10 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
                   PygButton(135, 161, 9, 9,
                             draw_func=draw_dec)]  # second dec
 
-    settings_dd = [PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)]
+    settings_dd = PygDropdown(80, 50, 100, 20, DAYS_TEXT, font)
 
     routes = PygPageLabel(20, 200, 160, 250, [],
                           font=sidebar_font, background_color=(255, 255, 255))
-
-    # buttons = {ZOOM: [PygButton(x=map_bound.width - PADDING - button_width,
-    #                             y=map_bound.height - PADDING - 2 * button_height,
-    #                             width=button_width, height=button_height,
-    #                             x_adjust=-200),
-    #                   PygButton(x=map_bound.width - PADDING - button_width,
-    #                             y=map_bound.height - PADDING - button_height,
-    #                             width=button_width, height=button_height,
-    #                             x_adjust=-200)],
-    #            SETTINGS: [PygDropdown(x=PADDING, y=PADDING,
-    #                                   width=PADDING * 2, height=PADDING // 2,
-    #                                   options=DAYS_TEXT),
-    #                       PygDropdown(x=PADDING * 4, y=PADDING,
-    #                                   width=PADDING, height=PADDING // 2,
-    #                                   options=[str(x) for x in range(0, 23)]),
-    #                       PygDropdown(x=PADDING * 5, y=PADDING,
-    #                                   width=PADDING, height=PADDING // 2,
-    #                                   options=[str(x) for x in range(0, 59)]),
-    #                       PygDropdown(x=PADDING * 6, y=PADDING,
-    #                                   width=PADDING, height=PADDING // 2,
-    #                                   options=[str(x) for x in range(0, 59)])],
-    #            GET_PATH: [PygButton(x=PADDING, y=height - PADDING - button_height,
-    #                                 width=button_width, height=button_height,
-    #                                 text=PATH_TEXT, visible=False)]
-    #            # 'label': [PygLabel(x=PADDING * 4, y=PADDING,
-    #            #                    width=PADDING, height=PADDING // 2,
-    #            #                    text='00')]
-    #            }
 
     # load image
     images = load_images(filename)
@@ -255,17 +190,23 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     path = Path()
 
     # Start the event loop
+    manager = Manager()
+    result_queue = manager.Queue()
+
+    logger = logging.getLogger(__name__)
+
     while True:
         # Draw map area
         draw_map(map_screen, tile, x, y)
         draw_path(map_screen, images[zoom], path, x, y)
         draw_waypoints(map_screen, images[zoom], waypoints, x, y)
-        # draw_zoom(map_screen, zoom_b, map_bound.width, map_bound.height)
         for button in zoom_b:
             button.draw(map_screen)
 
         # blit map onto screen
         screen.blit(map_screen, (map_bound.x, map_bound.y))
+
+        progress_bar.draw(screen)
 
         # Draw settings bar area
         pygame.draw.rect(screen, (0, 100, 0), (0, 0, 200, 600))
@@ -275,9 +216,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         for label in settings_l:
             label.draw(screen)
 
-        for dropdown in settings_dd:
-            dropdown.draw(screen)
-        # draw_buttons(screen, buttons, map_bound.width, map_bound.height)
+        settings_dd.draw(screen)
+
         routes.draw(screen)
 
         pygame.display.flip()
@@ -285,6 +225,31 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         # ---------------------------------------------------------------
         # Process events
         # ---------------------------------------------------------------
+
+        try:
+            message = result_queue.get_nowait()
+            logger.debug(message)
+            if message.startswith('DONE'):
+                path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(), eval(message[5:]))
+                path.set_visible(True)
+                routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
+                                      font=font, background_color=(255, 255, 255), visible=True)
+                progress_bar.set_visible(False)
+                curr_prog = 0
+                calculating = False
+                settings_b[0].on_click(pygame.event.Event(pygame.MOUSEBUTTONUP))
+                waypoints.append(0)
+            elif message.startswith('INFO'):
+                # setup the 0/x progress counter thingy
+                total_prog = eval(message[5:])  # total number of permutations/count max
+                pass
+            elif message.startswith('INC'):
+                curr_prog += 1
+                progress_bar.set_text(str(round(curr_prog / total_prog * 100, 2)) + '%')
+                pass
+        except queue.Empty:
+            pass
+
         event = pygame.event.wait()
 
         # End
@@ -311,57 +276,56 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
-        elif settings_b[0].on_click(event) and len(waypoints) == 2:
-            # print(f'Waypoints num: {len(waypoints["pts"])}')
-            time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
-                settings_l[6].text)
-            path.get_shapes(waypoints[0].get_lat_lon(),
-                            waypoints[1].get_lat_lon(),
-                            pathfinding.find_route(waypoints[0].get_lat_lon(),
-                                                   waypoints[1].get_lat_lon(),
-                                                   time,
-                                                   DAY_TO_INT[settings_dd[0].selected]))
-            path.set_visible(True)
-            routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
-                                  font=font, background_color=(255, 255, 255), visible=True)
-        elif settings_b[1].on_click(event):
-            waypoints = []
-            path.set_visible(False)
-            routes.set_visible(False)
-            # print(f'Waypoints num: {len(waypoints["pts"])}')
-        elif settings_b[2].on_click(event):  # hour inc
-            time_nums[0] = (time_nums[0] + 1) % 24
-            settings_l[4].set_text(str(time_nums[0]))  # refresh time label
-        elif settings_b[3].on_click(event):  # hour dec
-            time_nums[0] = (time_nums[0] - 1) % 24
-            settings_l[4].set_text(str(time_nums[0]))  # refresh time label
-        elif settings_b[4].on_click(event):  # minute inc
-            time_nums[1] = (time_nums[1] + 1) % 60
-            settings_l[5].set_text(str(time_nums[1]))  # refresh time label
-        elif settings_b[5].on_click(event):  # minute dec
-            time_nums[1] = (time_nums[1] - 1) % 60
-            settings_l[5].set_text(str(time_nums[1]))  # refresh time label
-        elif settings_b[6].on_click(event):  # second inc
-            time_nums[2] = (time_nums[2] + 1) % 60
-            settings_l[6].set_text(str(time_nums[2]))  # refresh time label
-        elif settings_b[7].on_click(event):  # second dec
-            time_nums[2] = (time_nums[2] - 1) % 60
-            settings_l[6].set_text(str(time_nums[2]))  # refresh time label
-        elif routes.on_click(event):
-            routes.on_select(event)
 
-        for dropdown in settings_dd:
-            dropdown.on_select(event)
+        if not calculating:
+            if settings_b[0].on_click(event) and len(waypoints) == 2:  # Get Routes
+                time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
+                    settings_l[6].text)
+
+                route_find_process = Process(target=pathfinding.find_route, args=(waypoints[0].get_lat_lon(),
+                                                                                  waypoints[1].get_lat_lon(),
+                                                                                  time,
+                                                                                  DAY_TO_INT[settings_dd.selected],
+                                                                                  result_queue))
+
+                progress_bar.set_visible(True)
+                calculating = True
+                route_find_process.start()
+
+            elif settings_b[1].on_click(event):  # Reset
+                waypoints = []
+                path.set_visible(False)
+                routes.set_visible(False)
+            elif settings_b[2].on_click(event):  # hour inc
+                time_nums[0] = (time_nums[0] + 1) % 24
+                settings_l[4].set_text(str(time_nums[0]))  # refresh time label
+            elif settings_b[3].on_click(event):  # hour dec
+                time_nums[0] = (time_nums[0] - 1) % 24
+                settings_l[4].set_text(str(time_nums[0]))  # refresh time label
+            elif settings_b[4].on_click(event):  # minute inc
+                time_nums[1] = (time_nums[1] + 1) % 60
+                settings_l[5].set_text(str(time_nums[1]))  # refresh time label
+            elif settings_b[5].on_click(event):  # minute dec
+                time_nums[1] = (time_nums[1] - 1) % 60
+                settings_l[5].set_text(str(time_nums[1]))  # refresh time label
+            elif settings_b[6].on_click(event):  # second inc
+                time_nums[2] = (time_nums[2] + 1) % 60
+                settings_l[6].set_text(str(time_nums[2]))  # refresh time label
+            elif settings_b[7].on_click(event):  # second dec
+                time_nums[2] = (time_nums[2] - 1) % 60
+                settings_l[6].set_text(str(time_nums[2]))  # refresh time label
+            elif routes.on_click(event):
+                routes.on_select(event)
+
+            settings_dd.on_select(event)  # Day selection
 
         mouse_x, mouse_y = pygame.mouse.get_pos()
 
         # Scroll and point logic
         if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (
         True, False, False):
-            # mouse_x, mouse_y = pygame.mouse.get_pos()
 
             if map_bound.contains(mouse_x, mouse_y) and not clicked:
-                # print('In Map')
                 x_diff, y_diff = scroll_diff(x, mouse_x - map_bound.x), scroll_diff(y, mouse_y - map_bound.y)
                 down = True
 
@@ -394,101 +358,3 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
                     y_diff = scroll_diff(y, mouse_y)
                 else:
                     y = new_y
-
-        # if event.type == pygame.MOUSEBUTTONDOWN:
-        #     # Get location data
-        #     mouse_x, mouse_y = pygame.mouse.get_pos()
-        #
-        #     for i in range(0, len(buttons[SETTINGS])):
-        #         if buttons[SETTINGS][i].on_click(event):
-        #             buttons[SETTINGS][i].on_select(event)
-        #             if i == 0:
-        #                 waypoints['day'] = DAY_TO_INT[buttons[SETTINGS][i].selected]
-        #             else:
-        #                 time = []
-        #                 for j in range(1, len(buttons[SETTINGS])):
-        #                     time.append(int(buttons[SETTINGS][j].selected))
-        #                 waypoints['time'] = time_to_sec(time)
-        #             clicked = True
-        #
-        #     # Zoom in
-        #     if buttons[ZOOM][0].on_click(event):
-        #         if clamp(zoom + 1) != zoom:
-        #             zoom = clamp(zoom + 1)
-        #             x, y = 0, 0
-        #             tile = load_zoom_image(images, zoom)
-        #         clicked = True
-        #
-        #     # Zoom out
-        #     elif buttons[ZOOM][1].on_click(event):
-        #         if clamp(zoom - 1) != zoom:
-        #             zoom = clamp(zoom - 1)
-        #             x, y = 0, 0
-        #             tile = load_zoom_image(images, zoom)
-        #         clicked = True
-        #
-        #     elif buttons[GET_PATH][0].on_click(event):
-        #         if buttons[GET_PATH][0].get_text() == PATH_TEXT:
-        #             # print('points: ' + str(waypoints['pts'][0].get_lat_lon()) +
-        #             #       ', ' + str(waypoints['pts'][1].get_lat_lon()) +
-        #             #       '; time: ' + str(waypoints['time']) + '; day: ' + str(waypoints['day']))
-        #             path.get_shapes(waypoints['pts'][0].get_lat_lon(),
-        #                             waypoints['pts'][1].get_lat_lon(),
-        #                             pathfinding.find_route(waypoints['pts'][0].get_lat_lon(),
-        #                                                    waypoints['pts'][1].get_lat_lon(),
-        #                                                    waypoints['time'],
-        #                                                    waypoints['day'], main.load_graph()))
-        #             path.set_visible(True)
-        #             buttons[GET_PATH][0].set_text(text=RESET_PATH_TEXT)
-        #         else:
-        #             reset = True
-        #             path.set_visible(False)
-        #         clicked = True
-
-            # Start scroll
-            # else:
-            #     x_diff, y_diff = scroll_diff(x, mouse_x), scroll_diff(y, mouse_y)
-            #     down = True
-
-        # if event.type == pygame.MOUSEBUTTONUP:
-        #     down = False
-        #
-        #     # Clicked point
-        #     if not (scroll or clicked):
-        #         mouse_x, mouse_y = pygame.mouse.get_pos()
-        #
-        #         # get lat/lon
-        #         user_lat, user_lon = images[zoom].coord_to_lat_lon(mouse_x, mouse_y, x, y)
-        #         check_points_clicked(user_lat, user_lon, waypoints, buttons[GET_PATH][0])
-        #     else:
-        #         scroll = False
-        #         clicked = False
-        #
-        #     if reset:
-        #         waypoints = reset_points(buttons[GET_PATH][0], buttons[SETTINGS][0],
-        #                                  buttons[SETTINGS][1], buttons[SETTINGS][2],
-        #                                  buttons[SETTINGS][3])
-        #         reset = False
-        #
-        # if event.type == pygame.MOUSEMOTION:
-        #     # scroll if mouse down
-        #     if down:
-        #         scroll = True
-        #         mouse_x, mouse_y = pygame.mouse.get_pos()
-        #         new_x, new_y = continue_scroll(images[zoom], width, height, x, y,
-        #                                        mouse_x, mouse_y, x_diff, y_diff)
-        #         if new_x == x:
-        #             x_diff = scroll_diff(x, mouse_x)
-        #         else:
-        #             x = new_x
-        #         if new_y == y:
-        #             y_diff = scroll_diff(y, mouse_y)
-        #         else:
-        #             y = new_y
-
-
-# if __name__ == "__main__":
-#     # pyta
-#
-#     # run map
-#     run_map()

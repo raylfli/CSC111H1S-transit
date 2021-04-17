@@ -320,13 +320,17 @@ class PygLabel:
     _bg_col: Optional[pygame.Color]
     _text_surface: pygame.Surface
     _txt_align: int
+    _draw_func: Callable
+    _visible: bool
 
     def __init__(self, x: int, y: int, width: int, height: int,
                  text: str,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  text_color: tuple[int, int, int] = (0, 0, 0),
                  background_color: Optional[tuple[int, int, int]] = None,
-                 txt_align: int = 0) -> None:
+                 txt_align: int = 0,
+                 draw_func: Callable = None,
+                 visible: bool = True) -> None:
         """Initialize PygLabel.
 
         txt_align values:
@@ -342,54 +346,65 @@ class PygLabel:
         self._rect = Rect(x, y, width, height)
         self._font = pygame.font.SysFont(font[0], font[1])
         self._set_text(text, font, text_color, txt_align)
+        self._draw_func = draw_func
 
         if background_color is not None:
             self._bg_col = pygame.Color(background_color)
         else:
             self._bg_col = None
 
+        self._visible = visible
+
     def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType], padding: int = 5) -> None:
         """Draw this label on the given surface.
         """
-        # draw background ----------------------------------------------
-        if self._bg_col is not None:
-            pygame.draw.rect(surface, self._bg_col,
-                             pygame.Rect(self._rect.x,
-                                         self._rect.y,
-                                         self._rect.width,
-                                         self._rect.height))
+        if self._visible:
+            # draw background ----------------------------------------------
+            if self._bg_col is not None:
+                pygame.draw.rect(surface, self._bg_col,
+                                 pygame.Rect(self._rect.x,
+                                             self._rect.y,
+                                             self._rect.width,
+                                             self._rect.height))
 
-        # draw text ---------------------------------------------------
-        width, height = self._text_surface.get_size()
-        # bottom left align
-        if self._txt_align == 0:
-            surface.blit(self._text_surface, (self._rect.x + self._rect.width / 15,
-                                              max(self._rect.y,
-                                                  self._rect.y + self._rect.height - height)),
-                         pygame.Rect(0, max(0, height - self._rect.height),
-                                     self._rect.width, self._rect.height))
-        # center align
-        elif self._txt_align == 1:
-            surface.blit(self._text_surface,
-                         (max(self._rect.x, (self._rect.width - width) // 2 + self._rect.x),
-                          max(self._rect.y,
-                              self._rect.y + (self._rect.height - height) // 2)),
-                         pygame.Rect(max(0, (width - self._rect.width) // 2),
-                                     max(0, (height - self._rect.height) // 2),
-                                     self._rect.width, self._rect.height))
-        # bottom right align
-        elif self._txt_align == 2:
-            surface.blit(self._text_surface, (
-                max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
-                max(self._rect.y,
-                    self._rect.y + self._rect.height - height)),
-                         pygame.Rect(max(0, width - self._rect.width),
-                                     max(0, height - self._rect.height),
-                                     self._rect.width, self._rect.height))
-        # top left align
-        elif self._txt_align == 3:
-            surface.blit(self._text_surface, (self._rect.x + padding,
-                                              self._rect.y + padding))
+            # Draw custom function
+            if self._draw_func is not None:
+                self._draw_func(surface,
+                                self._rect.x, self._rect.y,
+                                self._rect.width, self._rect.height,
+                                self.text)
+
+            # draw text ---------------------------------------------------
+            width, height = self._text_surface.get_size()
+            # bottom left align
+            if self._txt_align == 0:
+                surface.blit(self._text_surface, (self._rect.x + self._rect.width / 15,
+                                                  max(self._rect.y,
+                                                      self._rect.y + self._rect.height - height)),
+                             pygame.Rect(0, max(0, height - self._rect.height),
+                                         self._rect.width, self._rect.height))
+            # center align
+            elif self._txt_align == 1:
+                surface.blit(self._text_surface,
+                             (max(self._rect.x, (self._rect.width - width) // 2 + self._rect.x),
+                              max(self._rect.y,
+                                  self._rect.y + (self._rect.height - height) // 2)),
+                             pygame.Rect(max(0, (width - self._rect.width) // 2),
+                                         max(0, (height - self._rect.height) // 2),
+                                         self._rect.width, self._rect.height))
+            # bottom right align
+            elif self._txt_align == 2:
+                surface.blit(self._text_surface, (
+                    max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
+                    max(self._rect.y,
+                        self._rect.y + self._rect.height - height)),
+                             pygame.Rect(max(0, width - self._rect.width),
+                                         max(0, height - self._rect.height),
+                                         self._rect.width, self._rect.height))
+            # top left align
+            elif self._txt_align == 3:
+                surface.blit(self._text_surface, (self._rect.x + padding,
+                                                  self._rect.y + padding))
 
     def _set_text(self, text: str = None,
                   font: tuple[str, int] = (pygame.font.get_default_font(), 20),
@@ -410,6 +425,10 @@ class PygLabel:
     def get_dimensions(self) -> tuple[int, int]:
         """Return a tuple of the width and height of the PygLabel."""
         return self._text_surface.get_size()
+
+    def set_visible(self, visibility: bool) -> None:
+        """Set the visibility of this label."""
+        self._visible = visibility
 
 
 class PygMultiLabel:
@@ -560,7 +579,7 @@ class PygPageLabel:
     def __init__(self, x: int, y: int, width: int, height: int,
                  text: list[str], font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  text_color: tuple[int, int, int] = (0, 0, 0),
-                 background_color: Optional[list[tuple[int, int, int]]] = None,
+                 background_color: Optional[tuple[int, int, int]] = None,
                  txt_align: int = 3, visible: bool = False,
                  button_width: int = 9) -> None:
         """Initialize a PygPageLabel object.

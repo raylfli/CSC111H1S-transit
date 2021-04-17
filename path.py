@@ -3,6 +3,7 @@ import pygame
 from data_interface import TransitQuery, init_db
 from image import Image
 from typing import Union
+from collections import defaultdict
 
 
 class Path:
@@ -19,7 +20,7 @@ class Path:
     _stops_info: dict[int, dict[str, Union[dict, str]]]
     _visible: bool
     routes: list[dict[str, Union[str, int]]]
-    shapes: list[tuple[float, float]]
+    shapes: list[tuple[int, list[tuple[float, float]]]]
 
     def __init__(self, visible: bool = False) -> None:
         """Initialize a Path object."""
@@ -32,12 +33,14 @@ class Path:
              orig_x: int, orig_y: int, line_width: int = 2) -> None:
         """Draw the path"""
         if self._visible:
-            for i in range(0, len(self.shapes) - 1):
-                start_lat, start_lon = self.shapes[i]
-                end_lat, end_lon = self.shapes[i + 1]
-                start = image.lat_lon_to_coord(start_lat, start_lon, orig_x, orig_y)
-                end = image.lat_lon_to_coord(end_lat, end_lon, orig_x, orig_y)
-                pygame.draw.line(screen, pygame.Color('black'), start, end, line_width)
+            for i in range(0, len(self.shapes)):
+                for j in range(0, len(self.shapes[i][1]) - 1):
+                    start_lat, start_lon = self.shapes[i][1][j]
+                    end_lat, end_lon = self.shapes[i][1][j + 1]
+                    start = image.lat_lon_to_coord(start_lat, start_lon, orig_x, orig_y)
+                    end = image.lat_lon_to_coord(end_lat, end_lon, orig_x, orig_y)
+                    color = '#' + self._routes_info[self.shapes[i][0]]['route_color'] if self.shapes[i][0] != 0 else 'black'
+                    pygame.draw.line(screen, pygame.Color(color), start, end, line_width)
 
     def set_visible(self, value: bool) -> None:
         """Set visibility of path."""
@@ -52,7 +55,7 @@ class Path:
         # init_db('data', force=True)
         query = TransitQuery()
         shapes = []
-        self.shapes = [start]
+        self.shapes = [(0, [start])]
         self.routes = []
 
         for i in range(len(stops) - 1, -1, -1):
@@ -60,15 +63,27 @@ class Path:
             if trip_id != 0:
                 shapes.append(query.get_shape_data(trip_id, stop_id_start, stop_id_end))
                 self.routes.append({'start': stop_id_start, 'end': stop_id_end})
+            # else:
+            #     self.shapes[0].append((stop_id_start, stop_id_end))
 
         for i in range(0, len(shapes)):
             if shapes[i]['route_id'] not in self._routes_info:
                 self._routes_info[shapes[i]['route_id']] = \
                     query.get_route_info(shapes[i]['route_id'])
+
             self.routes[i].update(self._routes_info[shapes[i]['route_id']])
-            for lat_lon in shapes[i]['shape']:
-                self.shapes.append(lat_lon)
-        self.shapes.append(end)
+            if shapes[i]['route_id'] == self.shapes[-1][0]:
+                for lat_lon in shapes[i]['shape']:
+                    self.shapes[-1][1].append(lat_lon)
+            else:
+                self.shapes.append((shapes[i]['route_id'], [self.shapes[-1][1][-1]]))
+                for lat_lon in shapes[i]['shape']:
+                    self.shapes[-1][1].append(lat_lon)
+
+        if self.shapes[-1][0] != 0:
+            self.shapes.append((0, [self.shapes[-1][1][-1], end]))
+        else:
+            self.shapes[-1][1].append(end)
         query.close()
 
     def routes_to_text(self) -> list[str]:

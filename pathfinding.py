@@ -36,6 +36,10 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     start_id = query.get_closest_stops(start_loc[0], start_loc[1])
     end_id = query.get_closest_stops(end_loc[0], end_loc[1])
 
+    if distance(start_loc, end_loc) <= 1.5:  # check for close/walking dist
+        message_queue.put(('DONE', []))
+        return []
+
     start_stop_coords = graph.get_vertex(start_id[0]).location
     end_stop_coords = graph.get_vertex(end_id[0]).location
 

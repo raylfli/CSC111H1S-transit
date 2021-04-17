@@ -149,7 +149,7 @@ def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
                     # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
                     # node removed from open_set is guaranteed to be optimal. Then by extension we know
                     # we are not pushing any "bad" nodes.
-                    f_score = g_score[node] * 0.25 + h(node, goal)
+                    f_score = g_score[node] + h(node, goal)
                     open_set.put((f_score, push_counter, node))
                     push_counter += 1
 

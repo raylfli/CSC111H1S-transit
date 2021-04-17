@@ -104,8 +104,13 @@ class Path:
         stops = {}
         route_types = {0: 'Tram', 1: 'Subway', 3: 'Bus'}
         query = TransitQuery()
+        if self.routes[0]['start'] not in stops:
+            stops[self.routes[0]['start']] = query.get_stop_info(self.routes[0]['start'])
         routes_text = ['1.',
-                       'Walk from starting point to stop ' + str(self.routes[0]['start']), '']
+                       'Walk from starting point to stop ' +
+                       str(stops[self.routes[0]['start']]['stop_name']) +
+                       ' (' + str(stops[self.routes[0]['start']]['stop_code']) + ')',
+                       '']
         for i in range(0, len(self.routes)):
             routes_text.append(str(i + 2) + '.')
             routes_text.append('Route Name: ' + self.routes[i]['route_long_name'])
@@ -119,8 +124,11 @@ class Path:
                                ' to stop ' + str(stops[self.routes[i]['end']]['stop_name']) +
                                ' (' + str(stops[self.routes[i]['end']]['stop_code']) + ') ')
             routes_text.append('')
+        if self.routes[-1]['end'] not in stops:
+            stops[self.routes[-1]['end']] = query.get_stop_info(self.routes[-1]['end'])
         routes_text.extend([str(len(self.routes) + 2) + '.',
-                            'Walk from stop ' + str(self.routes[-1]['end']) + ' to destination'])
+                            'Walk from stop ' + str(stops[self.routes[-1]['end']]['stop_name']) +
+                            ' (' + str(stops[self.routes[-1]['end']]['stop_code']) + ')'])
         query.close()
         return routes_text
 

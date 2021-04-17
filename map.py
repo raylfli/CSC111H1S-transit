@@ -12,7 +12,7 @@ from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel
 from waypoint import Waypoint
 from path import Path
 from typing import Union
-from multiprocessing import Process, Queue
+from multiprocessing import Process, Queue, Manager
 import queue
 
 from graph import Graph
@@ -282,7 +282,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     path = Path()
 
     # Start the event loop
-    result_queue = Queue()
+    manager = Manager()
+    result_queue = manager.Queue()
     while True:
         # Draw map area
         draw_map(map_screen, tile, x, y)
@@ -316,6 +317,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
 
         try:
             message = result_queue.get_nowait()
+            print(message)
             if message.startswith('DONE'):
                 path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(), eval(message[5:]))
                 path.set_visible(True)

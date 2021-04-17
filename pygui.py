@@ -1,23 +1,48 @@
 """TTC Route Planner for Toronto, Ontario -- Pygame UI classes
 
-This file contains all Pygame GUI classes
+This file contains all Pygame GUI classes:
+    - Rect
+    - PygButton
+    - PygDropdown
+    - PygLabel
+    - PygMultiLabel
+    - PygPageLabel
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
+
 from typing import Union, Optional, Callable
 import pygame
 
 
+# -------------------------------------------------------------------------------------------
+# PyGUI Classes
+# -------------------------------------------------------------------------------------------
 class Rect:
-    """It's a rectangle. Please refer to kindergarten for detailed explanation.
-    (x, y) is the coordinate of the top left corner.
+    """A rectangle object.
+
+    Instance Attributes:
+        - x: int of the left-most x-coordinate
+        - y: int of the top-most y-coordinate
+        - width: int for the width of the rectangle
+        - height: int for the height of the rectangle
+
+    Representation Invariants:
+        - self.width >= 0
+        - self.height >= 0
     """
     x: int
     y: int
     width: int
     height: int
 
-    def __init__(self, x: int, y: int, width: int, height: int):
+    def __init__(self, x: int, y: int, width: int, height: int) -> None:
+        """Initialize a Rect object.
+
+        Preconditions:
+            - width >= 0
+            - height >= 0
+        """
         self.x, self.y, self.width, self.height = x, y, width, height
 
     def contains(self, x: int, y: int) -> bool:
@@ -27,24 +52,28 @@ class Rect:
         return self.x < x < self.x + self.width and self.y < y < self.y + self.height
 
 
-class Button:
-    """A clickable button."""
-    _rect: Rect
-
-    def on_click(self, event: pygame.event.Event) -> bool:
-        """Return true if the event clicked this button."""
-        raise NotImplementedError
-
-
 class PygButton:
-    """A clickable button."""
+    """A clickable button.
+    The button can display text and draw additional objects on top of it.
 
+    Representation Invariants:
+        - 0 <= self._txt_align <= 2
+    """
+    # Private Instance Attributes:
+    #   - _rect: Rect object of the area of the button
+    #   - _bg_color: pygame.Color of the colour of the background
+    #   - _depress_color: pygame.Color of the colour of the button when clicked
+    #   - _dep: bool if the button is clicked (true if clicked)
+    #   - _text: optional string of the text displayed on the button
+    #   - _font: pygame.font.Font for the optional text
+    #   - _txt_col: tuple of ints for text colour in RBG of optional text
+    #   - _txt_align: int for the alignment of the text, more detail in initializer
+    #   - _adjust: tuple of ints for the x-, y-adjustments for the Rect object coordinates
+    #   - _draw_func: custom draw function for any additional objects to draw
     _rect: Rect
     _bg_color: pygame.Color
     _depress_color: pygame.Color
     _dep: bool
-    _image: Optional[pygame.Surface]
-    _image_mode: int
     _text: Optional[str]
     _font: Optional[pygame.font.Font]
     _txt_col: Optional[tuple[int, int, int]]
@@ -53,28 +82,30 @@ class PygButton:
     _adjust: tuple[int, int]
     _draw_func: Callable
 
-    def __init__(self, x, y, width, height, text: str = None,
+    def __init__(self, x: int, y: int, width: int, height: int, text: str = None,
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  txt_col: tuple[int, int, int] = (0, 0, 0),
                  txt_align: int = 0,
                  color: tuple[int, int, int] = (255, 255, 255),
                  depress_color: tuple[int, int, int] = (200, 200, 200),
-                 image: str = None, image_mode: int = 0,
                  x_adjust: int = 0, y_adjust: int = 0,
-                 draw_func: Callable = None):
+                 draw_func: Callable = None) -> None:
         """Initialize a button. Customizable background colour, image.
-        Image modes:
-            - 0 if you wish for the image to be resized to the button's size (default)
-            - 1 if you wish to display the image at native resolution. The image will be anchored
-                at its top left corner, and any overflow will be clipped.
 
         Text align:
             - 0 for left align, bottom align
             - 1 for center align, middle align
-            - 2 for right align, bottom align # TODO
+            - 2 for right align, bottom align
+
+        Preconditions:
+            - width >= 0
+            - height >= 0
+            - 0 <= txt_align <= 2
+            - all{0 <= c <= 255 for c in txt_col}
+            - all{0 <= c <= 255 for c in color}
+            - all{0 <= c <= 255 for c in depress_color}
         """
         self._rect = Rect(x, y, width, height)
-        self._image_mode = image_mode
         self._bg_color = pygame.Color(color)
         self._depress_color = pygame.Color(depress_color)
         self._dep = False
@@ -82,18 +113,10 @@ class PygButton:
         self._adjust = (x_adjust, y_adjust)
         self._draw_func = draw_func
 
-        if image is not None:
-            self._image = pygame.image.load(image)
-            if image_mode == 0:
-                self._image = pygame.transform.scale(self._image,
-                                                     (self._rect.width, self._rect.height))
-        else:
-            self._image = None
-
     def _set_text(self, text: str = None,
                   font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                   txt_col: tuple[int, int, int] = (0, 0, 0), txt_align: int = 0) -> None:
-        """..."""
+        """Set text of this button."""
         if text is not None:
             self._text = text
             self._txt_col = txt_col
@@ -106,8 +129,9 @@ class PygButton:
             self._txt_col = None
             self._txt_surface = None
 
-    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]):
+    def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
         """Draw this button."""
+        # Draw when button is depressed or not
         if not self._dep:
             pygame.draw.rect(surface, self._bg_color,
                              (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
@@ -115,38 +139,47 @@ class PygButton:
             pygame.draw.rect(surface, self._depress_color,
                              (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
 
+        # Draw text if necessary
         if self._text is not None:
             width, height = self._txt_surface.get_size()
+            # bottom left align
             if self._txt_align == 0:
                 surface.blit(self._txt_surface, (self._rect.x + self._rect.width / 15,
                                                  max(self._rect.y,
                                                      self._rect.y + self._rect.height - height)),
                              pygame.Rect(0, max(0, height - self._rect.height),
                                          self._rect.width, self._rect.height))
+            # center align
             elif self._txt_align == 1:
-                surface.blit(self._txt_surface, (max(self._rect.x, (self._rect.width - width) / 2 + self._rect.x),
+                surface.blit(self._txt_surface, (max(self._rect.x,
+                                                     (self._rect.width - width) // 2
+                                                     + self._rect.x),
                                                  max(self._rect.y,
-                                                     self._rect.y + (self._rect.height - height) / 2)),
-                             pygame.Rect(max(0, (width - self._rect.width) / 2), max(0, (height - self._rect.height) / 2),
+                                                     self._rect.y
+                                                     + (self._rect.height - height) // 2)),
+                             pygame.Rect(max(0, (width - self._rect.width) // 2),
+                                         max(0, (height - self._rect.height) // 2),
                                          self._rect.width, self._rect.height))
+            # bottom right align
             elif self._txt_align == 2:
-                surface.blit(self._txt_surface, (max(self._rect.x, self._rect.x + self._rect.width - width) - self._rect.width / 15,
+                surface.blit(self._txt_surface, (max(self._rect.x,
+                                                     self._rect.x + self._rect.width - width)
+                                                 - self._rect.width / 15,
                                                  max(self._rect.y,
                                                      self._rect.y + self._rect.height - height)),
-                             pygame.Rect(max(0, width - self._rect.width), max(0, height - self._rect.height),
+                             pygame.Rect(max(0, width - self._rect.width),
+                                         max(0, height - self._rect.height),
                                          self._rect.width, self._rect.height))
 
-        if self._image is not None:
-            if self._image_mode == 1:
-                surface.blit(self._image, (self._rect.x, self._rect.y),
-                             pygame.Rect(0, 0, self._rect.width, self._rect.height))
-
+        # Draw using custom draw function
         if self._draw_func is not None:
-            self._draw_func(surface, self._rect.x, self._rect.y, self._rect.width, self._rect.height)
+            self._draw_func(surface, self._rect.x, self._rect.y,
+                            self._rect.width, self._rect.height)
 
     def on_click(self, event: pygame.event.Event) -> bool:
         """Return true if the event clicked this button."""
-        if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (True, False, False):
+        if event.type == pygame.MOUSEBUTTONDOWN and \
+                pygame.mouse.get_pressed(3) == (True, False, False):
             x, y = pygame.mouse.get_pos()
             if self._rect.contains(x + self._adjust[0], y + self._adjust[1]):
                 self._dep = True
@@ -155,14 +188,6 @@ class PygButton:
             self._dep = False
         return False
 
-    # def set_visible(self, value: bool) -> None:
-    #     """Set button as visible."""
-    #     self._visible = value
-
-    # def get_text(self) -> str:
-    #     """Return button text."""
-    #     return self._text
-
 
 class PygDropdown:
     """A dropdown menu.
@@ -170,6 +195,16 @@ class PygDropdown:
     Instance Attributes:
         - selected: string of the current selected option in the dropdown
     """
+    # Private Instance Attributes:
+    #   - _rect: Rect object of the area of the selected option of the menu
+    #   - _stack_rect: Rect object of the area of the rest of the options
+    #   - _active: bool of if the dropdown menu is active (showing dropdown options)
+    #   - _font: pygame.font.Font of the text font
+    #   - option_surfs: dictionary of the option to the pygame.Surface of the surface
+    #       containing the text of its key
+    #   - _option_nums: dictionary of option number to the option string
+    #   - field_col: pygame.Color of the colour of the field (selected option)
+    #   - _dropdown_col: pygame.Color of the colour of the dropdown (all options)
     selected: str
 
     _rect: Rect
@@ -189,7 +224,7 @@ class PygDropdown:
                  font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  txt_col: tuple[int, int, int] = (0, 0, 0),
                  field_col: tuple[int, int, int] = (255, 255, 255),
-                 dropdown_col: tuple[int, int, int] = (255, 255, 255)):
+                 dropdown_col: tuple[int, int, int] = (255, 255, 255)) -> None:
         """Initialize this menu. The options in this menu are given as a list of strings. The
         dropdown menu defaults to the first item in the list.
         Fonts are given as a tuple of font name and size.
@@ -212,18 +247,18 @@ class PygDropdown:
 
     def draw(self, surface: Union[pygame.Surface, pygame.SurfaceType]) -> None:
         """Draw this menu."""
-        # draw field
+        # Draw field
         pygame.draw.rect(surface, self._field_col,
                          (self._rect.x, self._rect.y, self._rect.width, self._rect.height))
         height = self._option_surfs[self.selected].get_size()[1]
         surface.blit(self._option_surfs[self.selected], (self._rect.x + self._rect.width / 15,
-                                                         max(self._rect.y, self._rect.y +
-                                                             self._rect.height - height)),
+                                                         max(self._rect.y, self._rect.y
+                                                             + self._rect.height - height)),
                      pygame.Rect(0, max(0, height - self._rect.height),
                                  self._rect.width, self._rect.height))
 
         if self._active:
-            # draw dropdowns
+            # Draw dropdowns
             for option in self._option_nums:
                 if self._option_nums[option] != self.selected:
                     self._draw_option(self._option_nums[option], option, surface)
@@ -240,7 +275,7 @@ class PygDropdown:
                      pygame.Rect(0, max(0, height - self._rect.height),
                                  self._rect.width, self._rect.height))
 
-    def on_select(self, event: pygame.event.Event):
+    def on_select(self, event: pygame.event.Event) -> None:
         """On select, either activates or deactivates this dropdown. The activated dropdown
         allows the selection of a new option."""
         if event.type == pygame.MOUSEBUTTONDOWN:
@@ -268,12 +303,6 @@ class PygDropdown:
 class PygLabel:
     """Text label. Does NOT support multiline labels.
 
-    Text align:
-            - 0 for left align, bottom align
-            - 1 for center align, middle align
-            - 2 for right align, bottom align
-            - 3 for left align, top align
-
     Instance Attributes:
         - text: string of the text to be displayed in the label
     """
@@ -283,7 +312,7 @@ class PygLabel:
     #   - _text_col: tuple of int for text colour in RGB
     #   - _bg_col: optional pygame.Color for the background colour
     #   - _text_surface: pygame.Surface where the text is displayed
-    #   - _txt_align: int for the text alignment, described in more detail above
+    #   - _txt_align: int for the text alignment, described in more detail in initializer
     _rect: Rect
     _font: pygame.font.Font
     text: str
@@ -299,6 +328,16 @@ class PygLabel:
                  background_color: Optional[tuple[int, int, int]] = None,
                  txt_align: int = 0) -> None:
         """Initialize PygLabel.
+
+        txt_align values:
+            - 0 for left align, bottom align
+            - 1 for center align, middle align
+            - 2 for right align, bottom align
+            - 3 for left align, top align
+
+        Preconditions:
+            - 0 <= txt_align <= 3
+            - all{0 <= c <= 255 for c in text_color}
         """
         self._rect = Rect(x, y, width, height)
         self._font = pygame.font.SysFont(font[0], font[1])
@@ -382,6 +421,10 @@ class PygMultiLabel:
         - shown_text: list of strings of text that fits in this PygMultiLabel object
         - not_shown_text: list of strings of text that cannot fit
         - cont: boolean of if there is a continuation of text that has not been shown yet
+
+    Representation Invariants:
+        - 0 <= self.txt_align <= 3
+        - all{0 <= c <= 255 for c in self.text_color}
     """
     # Private Instance Attributes
     #   - _rect: Rect object for the background
@@ -395,11 +438,16 @@ class PygMultiLabel:
     cont: bool
 
     def __init__(self, x: int, y: int, width: int, height: int,
-                 text, font: tuple[str, int] = (pygame.font.get_default_font(), 20),
+                 text: list[str], font: tuple[str, int] = (pygame.font.get_default_font(), 20),
                  text_color: tuple[int, int, int] = (0, 0, 0),
                  background_color: Optional[tuple[int, int, int]] = None,
                  txt_align: int = 3, visible: bool = False) -> None:
-        """Initialize PygMultiLabel."""
+        """Initialize PygMultiLabel.
+
+        Preconditions:
+            - 0 <= txt_align <= 3
+            - all{0 <= c <= 255 for c in text_color}
+        """
         self._rect = Rect(x, y, width, height)
         self._visible = visible
         self._set_text(text, font, text_color, background_color, txt_align)
@@ -515,7 +563,12 @@ class PygPageLabel:
                  background_color: Optional[list[tuple[int, int, int]]] = None,
                  txt_align: int = 3, visible: bool = False,
                  button_width: int = 9) -> None:
-        """Initialize a PygPageLabel object."""
+        """Initialize a PygPageLabel object.
+
+        Preconditions:
+            - 0 <= txt_align <= 3
+            - all{0 <= c <= 255 for c in text_color}
+        """
         self._visible = visible
         self.pages = []
         self._selected = 0
@@ -568,6 +621,9 @@ class PygPageLabel:
         self._visible = value
 
 
+# -------------------------------------------------------------------------------------------
+# Functions for drawing on increment labels
+# -------------------------------------------------------------------------------------------
 def draw_inc(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
     """Draw increment arrow."""
     pygame.draw.line(screen, pygame.Color('black'), (x, y + height * 3 / 4), (x + width / 2, y), 2)
@@ -595,5 +651,5 @@ if __name__ == "__main__":
         'extra-imports': ['pygame', 'typing'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']
+        'disable': ['E1136', 'E1121', 'R0902']
     })

@@ -5,6 +5,7 @@ The class stores the location of the point and draws the point.
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
+
 import pygame
 from image import Image
 
@@ -59,5 +60,5 @@ if __name__ == "__main__":
         'extra-imports': ['pygame', 'image'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']
+        'disable': ['E1136', 'E1121']
     })

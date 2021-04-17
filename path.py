@@ -5,6 +5,7 @@ given a starting and ending point.
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
+
 from typing import Union
 import pygame
 from data_interface import TransitQuery
@@ -110,6 +111,8 @@ class Path:
     def routes_to_text(self) -> list[str]:
         """Returns a list of steps for the user to take for this path.
          Returned list to be used in PygPageLabel.
+
+         Raise IndexError if self.routes is empty.
         """
         if self.routes == []:
             raise IndexError('Path.routes is empty, should call Path.get_shapes first')
@@ -149,7 +152,8 @@ class Path:
                 stops[self.routes[-1]['end']] = query.get_stop_info(self.routes[-1]['end'])
             routes_text.extend([str(len(self.routes) + 2) + '.',
                                 'Walk from stop ' + str(stops[self.routes[-1]['end']]['stop_name'])
-                                + ' (' + str(stops[self.routes[-1]['end']]['stop_code']) + ')'])
+                                + ' (' + str(stops[self.routes[-1]['end']]['stop_code']) + ')'
+                                + ' to destination'])
 
             # Close TransitQuery
             query.close()
@@ -168,5 +172,5 @@ if __name__ == '__main__':
         'extra-imports': ['pygame', 'data_interface', 'image', 'typing'],
         'allowed-io': [],
         'max-line-length': 100,
-        'disable': ['E1136']
+        'disable': ['E1136', 'E1121']
     })

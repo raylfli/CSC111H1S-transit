@@ -1,33 +1,29 @@
-"""
-CSC111 Final Project: TTC Transit Graph
+"""TTC Route Planner for Toronto, Ontario -- Main
 
-This module provides the implementation for the main visualizations and computations of
-this project.
-
-Running the main block of this module will:
-# TODO replace the following!
-#     1. Retrieve the necessary HURDAT2 data.
-#     2. Convert the raw data (.txt) into a usable .csv file.
-#     3. Parse the usable .csv into a list of Storm dataclasses.
-#     4. Create all visualizations.
-#     5. Generate HTML file that contains all the visualizations.
+This module setups and starts up the main program.
 
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
+
+import logging
 import os
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'HIDE'
+
+import data_interface
 from map import run_map
 
+# hide Pygame support prompts (spams console when opening new processes)
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'HIDE'
 
 if __name__ == '__main__':
-    run_map()
+    # uncomment/comment for debug messages/info messages in console.
+    logging.basicConfig(level=logging.DEBUG)
+    # logging.basicConfig(level=logging.INFO)
 
-    # import python_ta
-    #
-    # python_ta.check_all(config={
-    #     'max-line-length': 1000,
-    #     'disable': ['E1136'],
-    #     'extra-imports': ['csv', 'networkx'],
-    #     'allowed-io': ['load_review_graph'],
-    #     'max-nested-blocks': 4
-    # })
+    logger = logging.getLogger(__name__)
+
+    data_directory = 'data/'
+    logger.info(f'Initializing database using data from {data_directory}')
+    data_interface.init_db(data_directory)  # setup database (~30-45 secs)
+
+    logger.info('Starting pygame visualization')
+    run_map()  # start pygame visualization

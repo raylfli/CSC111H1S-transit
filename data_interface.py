@@ -34,8 +34,8 @@ def init_db(data_dir: str, force: bool = False) -> None:
         - os.isfile(data_dir + 'trips.txt')
         - files in the data_dir directory are formatted according to the GTFS static format.
     """
+    logger = logging.getLogger(__name__)
     if not os.path.isfile('transit.db') or force:
-        logger = logging.getLogger(__name__)
         logger.info('Initializing database into "transit.db"')
 
         con = sqlite3.connect('transit.db')
@@ -146,6 +146,7 @@ def init_db(data_dir: str, force: bool = False) -> None:
         con.close()
 
         logger.info('Database initialization completed')
+    logger.info('Database already exists, no action')
 
 
 def _insert_file(file_path: str, table_name: str, con: sqlite3.Connection) -> None:

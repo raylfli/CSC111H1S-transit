@@ -1,16 +1,23 @@
+"""TTC Route Planner for Toronto, Ontario -- Map Visualization
+
+This module packages the pygame visualization functions and provides code for running
+the map visualization.
+
+This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
-Draw map.
-"""
+
+import logging
+import queue
+from multiprocessing import Manager, Process
+from typing import Union
+
 import pygame
+
 import pathfinding
 from image import Image, load_images
-from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel, draw_inc, draw_dec
-from waypoint import Waypoint
 from path import Path
-from typing import Union
-from multiprocessing import Process, Manager
-import queue
-import logging
+from pygui import draw_dec, draw_inc, PygButton, PygDropdown, PygLabel, PygPageLabel, Rect
+from waypoint import Waypoint
 
 ALLOWED = [pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP,
            pygame.MOUSEMOTION, pygame.KEYDOWN]
@@ -77,7 +84,8 @@ def draw_path(screen: pygame.Surface, image: Image,
     path.draw(screen, image, orig_x, orig_y)
 
 
-def draw_progress(screen: pygame.Surface, x: int, y: int, width: int, height: int, text: str) -> None:
+def draw_progress(screen: pygame.Surface, x: int, y: int, width: int, height: int,
+                  text: str) -> None:
     """Draw progressed section for progress bar."""
     pygame.draw.rect(screen, (180, 180, 180), (x, y, width * eval(text[:-1]) / 100, height))
 
@@ -147,7 +155,10 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                         width=30, height=30,
                         x_adjust=-200, draw_func=draw_zoom_out)]
 
-    progress_bar = PygLabel(int(map_bound.x + map_bound.width / 18), int(map_bound.y + map_bound.height * 17 / 18), 100, 20, '0%', ('Calibri', 12), background_color=(255, 255, 255), txt_align=1, draw_func=draw_progress, visible=False)
+    progress_bar = PygLabel(int(map_bound.x + map_bound.width / 18),
+                            int(map_bound.y + map_bound.height * 17 / 18), 100, 20, '0%',
+                            ('Calibri', 12), background_color=(255, 255, 255), txt_align=1,
+                            draw_func=draw_progress, visible=False)
     total_prog = 1
     curr_prog = 0
 
@@ -157,10 +168,13 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                   PygLabel(20, 100, 70, 20, "Hours:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 125, 70, 20, "Minute:", font, background_color=(255, 255, 255)),
                   PygLabel(20, 150, 70, 20, "Second:", font, background_color=(255, 255, 255)),
-                  PygLabel(100, 100, 30, 20, str(time_nums[0]), font, background_color=(255, 255, 255), txt_align=2),
-                  PygLabel(100, 125, 30, 20, str(time_nums[1]), font, background_color=(255, 255, 255),
+                  PygLabel(100, 100, 30, 20, str(time_nums[0]), font,
+                           background_color=(255, 255, 255), txt_align=2),
+                  PygLabel(100, 125, 30, 20, str(time_nums[1]), font,
+                           background_color=(255, 255, 255),
                            txt_align=2),
-                  PygLabel(100, 150, 30, 20, str(time_nums[2]), font, background_color=(255, 255, 255),
+                  PygLabel(100, 150, 30, 20, str(time_nums[2]), font,
+                           background_color=(255, 255, 255),
                            txt_align=2)]
 
     settings_b = [PygButton(25, 500, 150, 20, "Get Route", font, txt_align=1),
@@ -189,12 +203,13 @@ def run_map(filename: str = "data/image_data/images_data.csv",
     # create path
     path = Path()
 
-    # Start the event loop
+    # create objects for multiprocessing
     manager = Manager()
     result_queue = manager.Queue()
 
     logger = logging.getLogger(__name__)
 
+    # Start the event loop
     while True:
         # Draw map area
         draw_map(map_screen, tile, x, y)
@@ -226,53 +241,65 @@ def run_map(filename: str = "data/image_data/images_data.csv",
         # Process events
         # ---------------------------------------------------------------
 
+        # multiprocessing message checks
         try:
             message = result_queue.get_nowait()
-            logger.debug(message)
+            logger.debug(f'Child process message recv: {message}')
             if message.startswith('DONE'):
-                path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(), eval(message[5:]))
+                logger.info('Displaying path')
+                path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(),
+                                eval(message[5:]))
                 path.set_visible(True)
                 routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
                                       font=font, background_color=(255, 255, 255), visible=True)
                 progress_bar.set_visible(False)
+                progress_bar.set_text('0%')
                 curr_prog = 0
                 calculating = False
                 settings_b[0].on_click(pygame.event.Event(pygame.MOUSEBUTTONUP))
                 waypoints.append(0)
             elif message.startswith('INFO'):
-                # setup the 0/x progress counter thingy
-                total_prog = eval(message[5:])  # total number of permutations/count max
-                pass
+                # setup route find progress bar
+                total_prog = eval(message[5:])
+                logger.info(f'Setup progress bar with total steps {total_prog}')
             elif message.startswith('INC'):
+                # increase progress bar
                 curr_prog += 1
                 progress_bar.set_text(str(round(curr_prog / total_prog * 100, 2)) + '%')
-                pass
+                logger.info(f'Incremented progress bar to progress {curr_prog} / {total_prog}')
         except queue.Empty:
             pass
 
-        event = pygame.event.wait()
+        event = pygame.event.poll()
 
         # End
         if event.type == pygame.QUIT or \
                 (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE):
             # Exit the event loop
+            logger.info('QUITTING')
             pygame.quit()
             return
 
         if zoom_b[0].on_click(event):  # Zoom in
             if (new_zoom := clamp(zoom + 1)) != zoom:
-                x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[new_zoom].width - map_bound.width / 2), -images[new_zoom].width + map_bound.width, 0)
-                y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[new_zoom].height - map_bound.height / 2), -images[new_zoom].height + map_bound.height, 0)
+                x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[
+                    new_zoom].width - map_bound.width / 2),
+                          -images[new_zoom].width + map_bound.width, 0)
+                y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[
+                    new_zoom].height - map_bound.height / 2),
+                          -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
         elif zoom_b[1].on_click(event):  # Zoom out
             if (new_zoom := clamp(zoom - 1)) != zoom:
                 x = clamp(-((map_bound.width / 2 - x) / images[zoom].width * images[
-                    new_zoom].width - map_bound.width / 2), -images[new_zoom].width + map_bound.width,
+                    new_zoom].width - map_bound.width / 2),
+                          -images[new_zoom].width + map_bound.width,
                           0)
                 y = clamp(-((map_bound.height / 2 - y) / images[zoom].height * images[
-                    new_zoom].height - map_bound.height / 2), -images[new_zoom].height + map_bound.height, 0)
+                    new_zoom].height - map_bound.height / 2),
+                          -images[new_zoom].height + map_bound.height, 0)
                 zoom = new_zoom
                 tile = load_zoom_image(images, zoom)
             clicked = True
@@ -282,11 +309,12 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                 time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
                     settings_l[6].text)
 
-                route_find_process = Process(target=pathfinding.find_route, args=(waypoints[0].get_lat_lon(),
-                                                                                  waypoints[1].get_lat_lon(),
-                                                                                  time,
-                                                                                  DAY_TO_INT[settings_dd.selected],
-                                                                                  result_queue))
+                route_find_process = Process(target=pathfinding.find_route,
+                                             args=(waypoints[0].get_lat_lon(),
+                                                   waypoints[1].get_lat_lon(),
+                                                   time,
+                                                   DAY_TO_INT[settings_dd.selected],
+                                                   result_queue))
 
                 progress_bar.set_visible(True)
                 calculating = True
@@ -323,10 +351,11 @@ def run_map(filename: str = "data/image_data/images_data.csv",
 
         # Scroll and point logic
         if event.type == pygame.MOUSEBUTTONDOWN and pygame.mouse.get_pressed(3) == (
-        True, False, False):
+                True, False, False):
 
             if map_bound.contains(mouse_x, mouse_y) and not clicked:
-                x_diff, y_diff = scroll_diff(x, mouse_x - map_bound.x), scroll_diff(y, mouse_y - map_bound.y)
+                x_diff, y_diff = scroll_diff(x, mouse_x - map_bound.x), \
+                                 scroll_diff(y, mouse_y - map_bound.y)
                 down = True
 
         if event.type == pygame.MOUSEBUTTONUP:
@@ -348,7 +377,8 @@ def run_map(filename: str = "data/image_data/images_data.csv",
                 mouse_x -= map_bound.x
                 mouse_y -= map_bound.y
                 scroll = True
-                new_x, new_y = continue_scroll(images[zoom], map_bound.width, map_bound.height, x, y,
+                new_x, new_y = continue_scroll(images[zoom], map_bound.width, map_bound.height, x,
+                                               y,
                                                mouse_x, mouse_y, x_diff, y_diff)
                 if new_x == x:
                     x_diff = scroll_diff(x, mouse_x)

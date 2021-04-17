@@ -396,60 +396,58 @@ class PygMultiLabel:
         i = 0
         text_height = 0
         for j in range(0, len(text)):
-            self.text.extend(self._get_wrap_text(text[j], font))
+            self.text.extend(self._get_wrap_text(text[j], font, padding))
 
         while (i < len(self.text)) and \
                 (self._rect.y + i * (text_height + padding) < self._rect.y + self._rect.height):
-            self.shown_text.append(text[i])
+            self.shown_text.append(self.text[i])
             if i == 0:
                 new_label = PygLabel(self._rect.x, self._rect.y,
-                                     self._rect.width, self._rect.height, text[i],
+                                     self._rect.width, self._rect.height, self.text[i],
                                      font, text_col, background_color, txt_align)
-                # text_width, text_height = new_label.get_dimensions()
-                # if text_width > self._rect.width:
-                #     new_text = text[i].split()
                 self.labels.append(new_label)
             else:
-                text_width, text_height = self.labels[i - 1].get_dimensions()
+                text_height = self.labels[i - 1].get_dimensions()[1]
                 new_label = PygLabel(self._rect.x,
                                      self._rect.y + i * (text_height + padding),
-                                     self._rect.width, text_height + padding, text[i],
+                                     self._rect.width, text_height + padding, self.text[i],
                                      font, text_col, background_color, txt_align)
                 self.labels.append(new_label)
             i += 1
 
-        if i >= len(text):
+        if i >= len(self.text):
             self.cont = False
             self.not_shown_text = []
         else:
             self.cont = True
-            self.not_shown_text = text[i:]
+            self.not_shown_text = self.text[i:]
 
-    def _get_wrap_text(self, text: str, given_font: tuple[str, int]) -> list[str]:
+    def _get_wrap_text(self, text: str, given_font: tuple[str, int], padding: int) -> list[str]:
         """Render text to get dimensions."""
         font = pygame.font.SysFont(given_font[0], given_font[1])
-        text_width, text_height = font.size(text)
+        text_width = font.size(text)[0]
         box_width = self._rect.width
 
-        if text_width > box_width:
+        if text_width > box_width - (2 * padding):
             # wrap text
             words = text.split()
-            return self._wrap_text(words, [], font, box_width)[0]
+            return self._wrap_text(words, [], font, box_width, padding)[0]
         else:
             return [text]
 
     def _wrap_text(self, words: list[str], finished_text: list[str],
-                   font: pygame.font.SysFont, box_width: int) -> tuple[list[str], list[str]]:
+                   font: pygame.font.SysFont, box_width: int, padding: int) -> tuple[list[str], list[str]]:
         """Wrap text."""
         if words == []:
             return (finished_text, [])
         else:
             i = 1
             new_words = words[0]
-            while i < len(words) and font.size(new_words)[0] < box_width:
+            while i < len(words) - 1 and \
+                    font.size(new_words + ' ' + words[i])[0] < box_width - (2 * padding):
                 new_words += ' ' + words[i]
                 i += 1
-            return self._wrap_text(words[i:], finished_text + [new_words], font, box_width)
+            return self._wrap_text(words[i:], finished_text + [new_words], font, box_width, padding)
 
     def set_visible(self, value: bool) -> None:
         """Set visibility of PygMultiLine."""
@@ -478,10 +476,18 @@ class PygPageLabel:
         self.pages.append(label)
 
         if label.cont:
-            self.buttons = (PygButton(x - button_width, y + height // 2,
-                                      button_width, button_width, font=font, draw_func=draw_page_left),
-                            PygButton(x + width, y + height // 2,
-                                      button_width, button_width, font=font, draw_func=draw_page_right))
+            # self.buttons = (PygButton(x - button_width, y + height // 2,
+            #                           button_width, button_width, font=font,
+            #                           draw_func=draw_page_left),
+            #                 PygButton(x + width, y + height // 2,
+            #                           button_width, button_width, font=font,
+            #                           draw_func=draw_page_right))
+            self.buttons = (PygButton(x + width // 2 - button_width // 2, y - button_width,
+                                      button_width, button_width, font=font,
+                                      draw_func=draw_inc),
+                            PygButton(x + width // 2 - button_width // 2, y + height,
+                                      button_width, button_width, font=font,
+                                      draw_func=draw_dec))
         else:
             self.buttons = None
 
@@ -518,14 +524,29 @@ class PygPageLabel:
         self._visible = value
 
 
-def draw_page_left(screen: pygame.Surface, x: int, y: int, width:int, height: int) -> None:
-    """Draw page left button."""
-    pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y), 2)
-    pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y + height), 2)
+# def draw_page_left(screen: pygame.Surface, x: int, y: int, width:int, height: int) -> None:
+#     """Draw page left button."""
+#     pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y), 2)
+#     pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 2), (x + width * 3 / 4, y + height), 2)
+#
+#
+# def draw_page_right(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
+#     """Draw page right button."""
+#     pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y), (x + width, y + height / 2), 2)
+#     pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y + height),
+#                      (x + width, y + height / 2), 2)
 
 
-def draw_page_right(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
-    """Draw page right button."""
-    pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y), (x + width, y + height / 2), 2)
-    pygame.draw.line(screen, pygame.Color('black'), (x + width / 4, y + height),
-                     (x + width, y + height / 2), 2)
+def draw_inc(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
+    """Draw increment arrow"""
+    pygame.draw.line(screen, pygame.Color('black'), (x, y + height * 3 / 4), (x + width / 2, y), 2)
+    pygame.draw.line(screen, pygame.Color('black'), (x + width / 2, y),
+                     (x + width, y + height * 3 / 4), 2)
+
+
+def draw_dec(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
+    """Draw decrement arrow"""
+    pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 4),
+                     (x + width / 2, y + height), 2)
+    pygame.draw.line(screen, pygame.Color('black'), (x + width / 2, y + height),
+                     (x + width, y + height / 4), 2)

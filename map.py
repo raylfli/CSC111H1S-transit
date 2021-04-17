@@ -1,14 +1,10 @@
 """
-
-To-do:
-    - Display sidebar for path info
-    - Get larger zoom images
-
+Draw map.
 """
 import pygame
 import pathfinding
 from image import Image, load_images
-from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel
+from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel, draw_inc, draw_dec
 from waypoint import Waypoint
 from path import Path
 from typing import Union
@@ -62,15 +58,15 @@ def draw_zoom_in(screen: pygame.Surface, x: int, y: int, width: int, height: int
         - button[0].height > button[1].height
 
     """
-    pygame.draw.line(screen, pygame.Color('black'), # horizontal line
+    pygame.draw.line(screen, pygame.Color('black'),  # horizontal line
                      (x + width / 10, y + height / 2), (x + width - width / 10, y + height / 2), 7)
-    pygame.draw.line(screen, pygame.Color('black'), # vertical line
+    pygame.draw.line(screen, pygame.Color('black'),  # vertical line
                      (x + width / 2, y + height / 10), (x + width / 2, y + height - height / 10), 7)
 
 
 def draw_zoom_out(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
     """Draw function for zoom out"""
-    pygame.draw.line(screen, pygame.Color('black'), # horizontal line
+    pygame.draw.line(screen, pygame.Color('black'),  # horizontal line
                      (x + width / 10, y + height / 2), (x + width - width / 10, y + height / 2), 7)
 
 
@@ -97,8 +93,7 @@ def draw_waypoints(screen: pygame.Surface, image: Image, waypoints: list,
                    orig_x: int, orig_y: int) -> None:
     """dkm this isn't acc drawing waypoints"""
     for waypoint in waypoints:
-        x, y = image.lat_lon_to_coord(waypoint.lat, waypoint.lon, orig_x=orig_x, orig_y=orig_y)
-        pygame.draw.circle(screen, pygame.Color('black'), (x, y), 4)
+        waypoint.draw(screen, image, orig_x, orig_y)
 
 
 def draw_path(screen: pygame.Surface, image: Image,
@@ -131,10 +126,9 @@ def clamp(num, min_value: int = 0, max_value: int = 3):
 def check_points_clicked(lat: float, lon: float,
                          waypoints: list) -> None:
     """Mutate points to reflect if the point is the starting or ending destination"""
-    # if waypoints['pts'] == []:
-    #     waypoints['pts'].append(Waypoint(lat, lon, chosen_start=True))
-    if len(waypoints) <= 1:
-        # button.set_visible(True)
+    if waypoints == []:
+        waypoints.append(Waypoint(lat, lon, chosen_start=True))
+    elif len(waypoints) <= 1:
         waypoints.append(Waypoint(lat, lon, chosen_end=True))
 
 
@@ -156,19 +150,6 @@ def reset_points(button: PygButton, day_dropdown: PygDropdown, hr_dropdown: PygD
     time = [int(hr_dropdown.selected), int(min_dropdown.selected), int(sec_dropdown.selected)]
     time_in_sec = time_to_sec(time)
     return {'day': DAY_TO_INT[day_dropdown.selected], 'time': time_in_sec, 'pts': []}
-
-
-def draw_inc(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
-    """Draw increment arrow"""
-    pygame.draw.line(screen, pygame.Color('black'), (x, y + height * 3 / 4), (x + width / 2, y), 2)
-    pygame.draw.line(screen, pygame.Color('black'), (x + width / 2, y), (x + width, y + height * 3 / 4), 2)
-
-
-def draw_dec(screen: pygame.Surface, x: int, y: int, width: int, height: int) -> None:
-    """Draw decrement arrow"""
-    pygame.draw.line(screen, pygame.Color('black'), (x, y + height / 4), (x + width / 2, y + height), 2)
-    pygame.draw.line(screen, pygame.Color('black'), (x + width / 2, y + height),
-                     (x + width, y + height / 4), 2)
 
 
 def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
@@ -194,7 +175,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     zoom = 0
 
     font = ("Calibri", 20)
-    sidebar_font = ("Calibri", 14)
+    sidebar_font = ("Calibri", 11)
 
     waypoints = []
 
@@ -277,8 +258,8 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     while True:
         # Draw map area
         draw_map(map_screen, tile, x, y)
-        draw_waypoints(map_screen, images[zoom], waypoints, x, y)
         draw_path(map_screen, images[zoom], path, x, y)
+        draw_waypoints(map_screen, images[zoom], waypoints, x, y)
         # draw_zoom(map_screen, zoom_b, map_bound.width, map_bound.height)
         for button in zoom_b:
             button.draw(map_screen)

@@ -12,6 +12,8 @@ from pygui import PygButton, PygDropdown, PygLabel, Rect, PygPageLabel
 from waypoint import Waypoint
 from path import Path
 from typing import Union
+from multiprocessing import Process, Queue
+import queue
 
 from graph import Graph
 
@@ -280,6 +282,7 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
     path = Path()
 
     # Start the event loop
+    result_queue = Queue()
     while True:
         # Draw map area
         draw_map(map_screen, tile, x, y)
@@ -310,6 +313,24 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
         # ---------------------------------------------------------------
         # Process events
         # ---------------------------------------------------------------
+
+        try:
+            message = result_queue.get_nowait()
+            if message.startswith('DONE'):
+                path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon(), eval(message[5:]))
+                path.set_visible(True)
+                routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
+                                      font=font, background_color=(255, 255, 255), visible=True)
+            elif message.startswith('INFO'):
+                # setup the 0/x progress counter thingy
+                num = eval(message[5:])  # total number of permutations/count max
+                pass
+            elif message.startswith('INC'):
+                # increment counter thingy
+                pass
+        except queue.Empty:
+            pass
+
         event = pygame.event.wait()
 
         # End
@@ -338,12 +359,26 @@ def run_map(graph: Graph, filename: str = "data/image_data/images_data.csv",
             # print(f'Waypoints num: {len(waypoints["pts"])}')
             time = int(settings_l[4].text) * 3600 + int(settings_l[5].text) * 60 + int(
                 settings_l[6].text)
-            path.get_shapes(waypoints[0].get_lat_lon(),
-                            waypoints[1].get_lat_lon(),
-                            pathfinding.find_route(waypoints[0].get_lat_lon(),
-                                                   waypoints[1].get_lat_lon(),
-                                                   time,
-                                                   DAY_TO_INT[settings_dd[0].selected]))
+
+            print(id(result_queue))
+            route_find_process = Process(target=pathfinding.find_route, args=(waypoints[0].get_lat_lon(),
+                                                                              waypoints[1].get_lat_lon(),
+                                                                              time,
+                                                                              DAY_TO_INT[settings_dd[0].selected],
+                                                                              result_queue))
+
+            route_find_process.start()
+            print('hi-------------------------------------------------------')
+            # elif not route_find_process.is_alive():
+            #     print('here!')
+            #     path.get_shapes(waypoints[0].get_lat_lon(), waypoints[1].get_lat_lon())
+
+            # path.get_shapes(waypoints[0].get_lat_lon(),
+            #                 waypoints[1].get_lat_lon(),
+            #                 pathfinding.find_route(waypoints[0].get_lat_lon(),
+            #                                        waypoints[1].get_lat_lon(),
+            #                                        time,
+            #                                        DAY_TO_INT[settings_dd[0].selected]))
             path.set_visible(True)
             routes = PygPageLabel(20, 200, 160, 250, path.routes_to_text(),
                                   font=font, background_color=(255, 255, 255), visible=True)

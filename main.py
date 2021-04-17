@@ -15,31 +15,9 @@ Running the main block of this module will:
 This file is Copyright (c) 2021 Anna Cho, Charles Wong, Grace Tian, Raymond Li
 """
 import data_interface
-from graph import Graph
+import graph
 from pathfinding import find_route
 from map import run_map
-
-
-def load_graph() -> Graph():
-    """Return a transit system graph using the processed data from data_interface.py.
-
-    The transit system graph stores one vertex for each stop in the dataset.
-    Each vertex stores as its item either a Stop ID, and the "location" _Vertex attribute stores
-    the latitude and longitude of each stop.
-
-    Edges represent a one-way connection between two existing stops.
-    """
-    g = Graph()
-    data_interface.init_db('data/')
-    q = data_interface.TransitQuery()
-    print('load db')
-    for vertex in q.get_stops():
-        g.add_vertex(vertex[0], vertex[1])
-    print('add vertex')
-    for edge in q.get_edges():
-        g.add_edge(edge[0], edge[1])
-    print('add edge')
-    return g
 
 
 if __name__ == '__main__':
@@ -48,7 +26,7 @@ if __name__ == '__main__':
     # g = load_graph()
     # q = data_interface.TransitQuery()
     # print(a_star(g.get_vertex(14155), g.get_vertex(9392), 62429, 7, q, g))
-    g = load_graph()
+    g = graph.load_graph()
     run_map(graph=g)
     # import python_ta
     # # todo modify the PyTA check

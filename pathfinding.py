@@ -2,7 +2,7 @@
 from collections import defaultdict
 from math import inf
 from multiprocessing import Pool
-from queue import PriorityQueue
+from queue import PriorityQueue, Queue
 from typing import Optional, Union
 
 from data_interface import TransitQuery
@@ -11,7 +11,7 @@ from util import distance
 
 
 def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], time: int,
-               day: int) -> list[tuple[int, int, int]]:
+               day: int, message_queue: Queue) -> list[tuple[int, int, int]]:
     """Given a start location, end location, and time block, compute the quickest transit route.
     Returns a list of tuples (trip_id, start stop_id, end stop_id).
     Note that the list is in reverse order of the actual route, i.e. element 0 of the returned list
@@ -30,21 +30,23 @@ def find_route(start_loc: tuple[float, float], end_loc: tuple[float, float], tim
     start_stop_coords = graph.get_vertex(start_id[0]).location
     end_stop_coords = graph.get_vertex(end_id[0]).location
 
-    start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.2)
-    end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.2)
+    start_ids = query.get_closest_stops(start_stop_coords[0], start_stop_coords[1], 0.1)
+    end_ids = query.get_closest_stops(end_stop_coords[0], end_stop_coords[1], 0.1)
 
-    # print(f'length start_id: {len(start_ids)}')
-    # print(f'length end_id: {len(end_ids)}')
+    print(f'length start_id: {len(start_ids)}')
+    print(f'length end_id: {len(end_ids)}')
+
+    message_queue.put(f'INFO {len(start_ids) * len(end_ids)}')
 
     with Pool(maxtasksperchild=1) as p:
-        paths = p.starmap(a_star, ((id1, id2, time, day) for id1 in start_ids for id2 in end_ids))
+        paths = p.starmap(a_star, ((id1, id2, time, day, message_queue) for id1 in start_ids for id2 in end_ids))
 
     path = min(paths, key=lambda x: x[1])
-    print(path)
+    message_queue.put(f'DONE {path[0]}')  # tell parent process pathfinding complete
     return path[0]
 
 
-def a_star(id1: int, id2: int, time: int, day: int) \
+def a_star(id1: int, id2: int, time: int, day: int, message_queue: Queue) \
         -> Optional[tuple[list[tuple[int, int, int]], Union[int, float]]]:
     """A* algorithm for graph pathfinding.
 
@@ -86,7 +88,8 @@ def a_star(id1: int, id2: int, time: int, day: int) \
             # print(f'Day arrival: {path_bin[curr.stop_id][4]}   Day departure: {day}')
             delta_t = 86400 - time + (((path_bin[curr.stop_id][4] - day) % 7) - 1) * 86400 + \
                       path_bin[curr.stop_id][3]
-            return (construct_path(path_bin, curr.stop_id), delta_t)
+            message_queue.put('INC')
+            return (construct_filtered_path(path_bin, curr.stop_id), delta_t)
 
         # Note that this only works if the heuristic is both consistent and admissible. Then
         # the arrival time to the current stop will be on the optimal path, and therefore we
@@ -132,7 +135,7 @@ def a_star(id1: int, id2: int, time: int, day: int) \
                     push_counter += 1
         # walking = query.get_closest_stops(curr.location[0], curr.location[1], 0.25)
         # print(f'Walking stops: {len(walking)}')
-        for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.05):
+        for stop in query.get_closest_stops(curr.location[0], curr.location[1], 0.075):
             if stop != curr.stop_id:
                 # if stop not in neighbour_id and stop != curr.stop_id and stop not in bar_revisit:
                 #     print(f'    Walking to: {curr.stop_id} -> {stop}')
@@ -157,7 +160,7 @@ def a_star(id1: int, id2: int, time: int, day: int) \
                     # Calculate f_score for neighbour and push onto open_set. If h is consistent, any
                     # node removed from open_set is guaranteed to be optimal. Then by extension we know
                     # we are not pushing any "bad" nodes.
-                    f_score = g_score[node] + h(node, goal)
+                    f_score = g_score[node] * 0.25 + h(node, goal)
                     open_set.put((f_score, push_counter, node))
                     push_counter += 1
         # print(f'f_score: {[(i[0], i[1].stop_id) for i in open_set.queue]}')
